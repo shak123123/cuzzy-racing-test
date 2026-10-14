@@ -231,6 +231,7 @@ export class Session {
     if (this.smartThr && !S.reverse) { const rise = S.gear <= 1 ? 1.6 : S.gear === 2 ? 2.4 : 4; this.thrSm = thr > (this.thrSm || 0) ? Math.min(thr, (this.thrSm || 0) + rise * dt) : thr; thr = this.thrSm; } // on/off pedal squeezed in over ~0.3-0.6 s
     if (this.o.mode === 'test' && this.testLimit && Math.abs(S.vx) > this.testLimit) thr = 0;
     this.inp.throttle = thr; this.inp.brake = brk; this.inp.steer = st; this.inp.handbrake = hb;
+    if (this.app.vr?.active) this.app.vr.input(this, dt); // p52 VR wheel + pedals
     if (thr || brk || Math.abs(st) > 0.05 || hb) this.lastAct = performance.now();
   }
   canTurbo() { return this.car?.id === 'kitt'; }
@@ -587,6 +588,7 @@ export class Session {
     else if (this.s.graphics.shake && spd > 40 && this.camMode !== 'orbit') { cam.position.y += (Math.random() - 0.5) * 0.012 * (spd - 40) / 20; }
     this.foot?.cam(dt);
     this.ktv?.step(dt, this.g, this.camMode === 'cockpit' && !this.foot?.active, !!this.S.reverse); // after every camera move (incl. shake), so the clip player stays locked to the TV
+    if (this.app.vr?.active) this.app.vr.update(dt, this); // p52 VR seat / hands / wheel / dash
     if (this.shotCam) { const c = this.shotCam; cam.position.set(c[0], c[1], c[2]); cam.lookAt(c[3], c[4], c[5]); cam.clearViewOffset(); } // test screenshots only (tests/x_lm_shots.mjs)
   }
   dispose() { this.app.rumble?.stop();

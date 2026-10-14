@@ -18,6 +18,7 @@ import { Showroom, CATS } from './showroom.js';
 import { SettingsUI, howtoHTML } from './ui_settings.js';
 import { UINav } from './uinav.js';
 import './chipselect.js'; // <chip-select>: tap chips instead of native <select> (phones)
+import { VR } from './vr.js';
 import { defaults, merge, HAS_TOUCH, IS_MOBILE, PRESETS, applyPreset, normalizeGfx, loadLocalGfx, saveLocalGfx } from './settings.js';
 import { buildCar, setLights, poseCar, disposeCar } from './carmodel.js';
 import { preloadRealCars, realReady, ensureRealModel, registerCars, loadTypes } from './realcars.js';
@@ -52,7 +53,7 @@ document.addEventListener('fullscreenchange', () => { if (_fsEl()) window.__czWa
 class App {
   constructor() {
     this.settings = defaults(); this.store = new Store(); this.stack = []; this.screen = 'boot'; this.session = null; this.paused = false;
-    this.gfx = new Gfx($('#c'), this.settings); this.audio = new AudioSys(this.settings); this.hud = new Hud(this);
+    this.gfx = new Gfx($('#c'), this.settings); try { this.vr = new VR(this); } catch (e) { console.warn('vr', e); } this.audio = new AudioSys(this.settings); this.hud = new Hud(this);
     this.net = new Net(); this.voice = new Voice(this.net, this.settings, this.audio); this.setui = new SettingsUI(this); this.auth = new AuthUI(this);
     setAuthLost(() => this.authLost()); this.net.on('autherr', () => this.authLost());
     this.solo = { mode: 'circuit', route: 'inner_ring', laps: 2, time: 'day', weather: 'dry' };
@@ -498,6 +499,7 @@ class App {
     let last = performance.now(), simT = last;
     const frame = t => {
       requestAnimationFrame(frame);
+      if (this.vr?.active && !this.vr.sim) return; // the XR session drives the loop (setAnimationLoop)
       const G = this.gfx; G.rafTick(t);
       const tgt = this.settings.graphics.fps || 60, hz = G.displayHz || 60; const dt = (t - last) / 1000;
       if (tgt < hz - 5 && dt * 1000 < 1000 / tgt - 500 / hz) return; last = t;

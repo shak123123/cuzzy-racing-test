@@ -218,6 +218,7 @@ export class Gfx {
     new THREE.TextureLoader().load('./real/tex/skybg.jpg', t => { t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace; this.skyPhoto = t; this.setTOD(this.tod, this.rainOn); });
   }
   resize() {
+    if (this.r.xr?.isPresenting) return; // p52: the XR layer owns the size
     const w = innerWidth, h = innerHeight; const g = this.s.graphics;
     const up = this.upMode(), base = Math.min(devicePixelRatio || 1, g.dprCap || 2, IOS ? 1.5 : 9);
     const sc = up === 'off' ? 1 : g.resAuto ? this.dynScale : g.res;
@@ -448,6 +449,7 @@ export class Gfx {
     // with the renderer-level shadow update OFF: they reuse last frame's map. The map is drawn by the first render of the
     // main view, with the player's car visible (it used to be drawn inside the probe face render, where the car is hidden
     // -> the car's shadow vanished for the frames until the next redraw = the blinking shadow)
+    if (this.r.xr?.isPresenting) { this.r.shadowMap.needsUpdate = true; this.r.render(this.scene, this.cam); this.fc++; return; } // p52 VR: straight to the XR layer (MSAA + foveation), no post chain / probe
     this.r.shadowMap.needsUpdate = false;
     if (this.cube && carPos && (++this.cubeN % this.cubeEvery === 0)) { const h = hideForProbe, sl = this.probeHide; if (h) h.visible = false; const slv = sl?.visible; if (sl) sl.visible = false; // parked cars / pedestrians are left out of the probe
       const far = !this._cubeInit || this.cube.position.distanceToSquared(carPos) > 900; // first use / teleport / showroom→world: refresh all six faces so no stale seam
