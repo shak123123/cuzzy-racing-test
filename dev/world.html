@@ -1,0 +1,17 @@
+<!doctype html><html><head><style>body{margin:0;background:#222}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"../js/lib/three.module.js"}}</script></head><body>
+<script type="module">
+import * as THREE from 'three';
+import { World } from '../js/world.js';
+const q = new URLSearchParams(location.search);
+const data = await (await fetch('../data/brum.json')).json(); const routes = await (await fetch('../data/routes.json')).json();
+const r = new THREE.WebGLRenderer({antialias:false}); r.setSize(innerWidth, innerHeight); r.toneMapping = THREE.ACESFilmicToneMapping; document.body.appendChild(r.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0x9fb4c8); sc.fog = new THREE.Fog(0x9fb4c8, 200, 1400);
+sc.add(new THREE.HemisphereLight(0xdde8ff, 0x555044, 1.2)); const sun = new THREE.DirectionalLight(0xfff0dd, 2.2); sun.position.set(300, 500, 200); sc.add(sun);
+const t0 = performance.now(); const w = new World(data, routes, {env: +(q.get('env')||2), shadows:false, aniso:4}, (s,p)=>console.log('prog',s,p));
+const g = await w.build(); sc.add(g); window.W = w; if (q.get('kit')) w.setRaceKit(q.get('kit')); console.log('build ms', performance.now()-t0);
+const cam = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.3, 3000);
+const [x,y,z,lx,ly,lz] = (q.get('cam')||'0,400,600,0,0,0').split(',').map(Number); cam.position.set(x,y,z); cam.lookAt(lx,ly,lz);
+w.update(0, q.get('night')==='1', false);
+r.render(sc, cam); window.info = r.info.render; window.done = true;
+</script></body></html>

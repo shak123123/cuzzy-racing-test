@@ -1,0 +1,22 @@
+<!doctype html><html><head><style>body{margin:0;background:#222}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"../js/lib/three.module.js"}}</script></head><body>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from '../js/lib/addons/environments/RoomEnvironment.js';
+import { buildCar, setCarEnv } from '../js/carmodel.js';
+const cars = await (await fetch('../shared/cars.json')).json();
+const q = new URLSearchParams(location.search); const ids = (q.get('ids')||'db9v,rrs23,mini64,escos,hurac,g63').split(',');
+const r = new THREE.WebGLRenderer({antialias:true}); r.setSize(innerWidth, innerHeight); r.toneMapping = THREE.ACESFilmicToneMapping; document.body.appendChild(r.domElement);
+r.shadowMap.enabled = true;
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0x8a939c);
+const pm = new THREE.PMREMGenerator(r); const env = pm.fromScene(new RoomEnvironment(), 0.04).texture; sc.environment = env; setCarEnv(env);
+const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(-5, 10, -6); sun.castShadow = true; sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.left=-20;sun.shadow.camera.right=20;sun.shadow.camera.top=20;sun.shadow.camera.bottom=-20; sc.add(sun);
+const fl = new THREE.Mesh(new THREE.PlaneGeometry(80,80), new THREE.MeshStandardMaterial({color:0x777777, roughness:.6})); fl.rotation.x=-Math.PI/2; fl.receiveShadow=true; sc.add(fl);
+const cols = +(q.get('cols')||3);
+ids.forEach((id,i)=>{ const c=cars.find(c=>c.id===id); const m=buildCar(c,{}); m.position.set((i%cols-(cols-1)/2)*6, 0, Math.floor(i/cols)*7); m.rotation.y = +(q.get('rot')||0.7); sc.add(m); });
+const cam = new THREE.PerspectiveCamera(35, innerWidth/innerHeight, .1, 200);
+const v = q.get('view')||'fr'; const rows = Math.ceil(ids.length/cols);
+cam.position.set(v==='side'?0:-8, +(q.get('h')||5), rows*7+9); cam.lookAt(0, 0.6, (rows-1)*3.5);
+if (q.get('zoom')) { const a=+q.get('zoom'); cam.position.set(Math.sin(a)*6.5,1.5,Math.cos(a)*6.5); cam.lookAt(0,0.6,0); }
+r.render(sc, cam); window.done = true;
+</script></body></html>

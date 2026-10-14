@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#888}</style>
+<script type="importmap">{"imports":{"three":"../js/lib/three.module.js"}}</script></head><body>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from '../js/lib/addons/environments/RoomEnvironment.js';
+import { PedKit } from '../js/streetlife.js';
+const q = new URLSearchParams(location.search); const T = +(q.get('t') || 0.3), close = q.has('close');
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); document.body.appendChild(r.domElement);
+r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace;
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0x9aa4ad); const pm = new THREE.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment()).texture;
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(3, 6, 5); sc.add(sun); sc.add(new THREE.HemisphereLight(0xcfe0ff, 0x554433, 0.6));
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x777777 })); gnd.rotation.x = -Math.PI / 2; sc.add(gnd);
+const K = PedKit, U = { value: T };
+// [hair, outfit, shak]  (shak: Shak's face decal + textured hair + his skin tone)
+const looks = [[['hairT'], ['jacket', 'trou', 'slvL'], 1], [['hairL'], ['dress', 'bare', 'slvS']], [['hairT'], ['trou', 'slvS'], 1], [['hairS', 'pony'], ['skirt', 'bare', 'slvL']], [['hijab'], ['jacket', 'skirt', 'bare', 'slvL']], [['hairT', 'cap'], ['hood', 'trou', 'slvL'], 1], [['hairS'], ['jacket', 'trou', 'slvL']], [['hairL', 'bun'], ['trou', 'slvS']], [['hairT'], ['hood', 'trou', 'slvL'], 1]];
+const n = looks.length, im = new THREE.InstancedMesh(K.pedGeometry(), K.pedMaterial(U), n); const g = im.geometry;
+const C = [[0x1d2a44, 0x283a5a, 0, 0], [0x7a3355, 0x161616, 0xc68a62, 0x1a1410], [0xd9d4c8, 0x324a6e, 0, 0], [0xd9d4c8, 0x324a6e, 0xe0ac86, 0xa8834f], [0x24483a, 0x2a2e38, 0x9b6641, 0x5a2436], [0x7a1f24, 0x3b3f46, 0, 0], [0x3a6ea5, 0x6e6250, 0xf1c9a5, 0x2e1f14], [0xe0b73a, 0x1f2a3d, 0xf6d7bd, 0x6b4a2a], [0x2f2f33, 0x1f2a3d, 0, 0]];
+const w = new Float32Array(n * 4), m = new Float32Array(n), cs = [0, 1, 2, 3].map(() => new Float32Array(n * 3)), col = new THREE.Color(), d = new THREE.Object3D();
+const H = [1.0, 0.95, 1.06, 0.97, 0.94, 0.98, 1.03, 0.96, 0.92];
+looks.forEach((L, i) => { m[i] = K.maskOf([...L[0], ...L[1], L[2] ? 'shak' : 'feat', i % 2 ? 'soleD' : 'soleW']); C[i].forEach((h, k) => { if (L[2] && k === 2) h = K.SHAK_SKIN; if (L[2] && k === 3) h = K.HAIR_C; col.set(h); cs[k].set([col.r, col.g, col.b], i * 3); });
+  w.set([i * 0.9, q.has('still') ? 0 : 7, L[1].includes('dress') || L[1].includes('skirt') ? 1 : 0.5, 1], i * 4); d.position.set((i - (n - 1) / 2) * 0.9, 0, 0); d.scale.set(1, H[i], H[i]);
+  d.rotation.y = q.has('side') ? Math.PI / 2 : q.has('q3') ? 0.6 : close ? 0 : 0.35; d.updateMatrix(); im.setMatrixAt(i, d.matrix); });
+g.setAttribute('iWalk', new THREE.InstancedBufferAttribute(w, 4)); g.setAttribute('iMask', new THREE.InstancedBufferAttribute(m, 1)); ['iC0', 'iC1', 'iC2', 'iC3'].forEach((nm, k) => g.setAttribute(nm, new THREE.InstancedBufferAttribute(cs[k], 3)));
+sc.add(im); const cam = new THREE.PerspectiveCamera(close ? 14 : 30, innerWidth / innerHeight, 0.1, 100);
+const fx = (0 - (n - 1) / 2) * 0.9 + (q.has('pick') ? +q.get('pick') * 0.9 : 0); if (close) { const hy = 1.64 * H[q.has('pick') ? +q.get('pick') : 0]; cam.position.set(fx + 0.12, hy + 0.05, 1.3); cam.lookAt(fx, hy - 0.02, 0); } else { cam.position.set(0, 1.1, 8.5); cam.lookAt(0, 0.9, 0); }
+let fin = false; const go = () => { if (fin) return; fin = true; r.render(sc, cam); window.DONE = 1; }; THREE.DefaultLoadingManager.onLoad = () => setTimeout(go, 50); r.render(sc, cam); setTimeout(go, 15000);
+</script></body></html>

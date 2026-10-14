@@ -1,0 +1,34 @@
+<!doctype html><html><head><base href="../"><style>body{margin:0;background:#222}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./js/lib/three.module.js"}}</script></head><body>
+<script type="module">
+// Car look check (dev only): one car on a studio floor, several camera views in one tall canvas.
+// ?id=r8&colour=0xd5d9de&views=fq,side,rq,front,rear,wheel
+import * as THREE from 'three';
+import { RoomEnvironment } from './js/lib/addons/environments/RoomEnvironment.js';
+import { buildCar, setCarEnv } from './js/carmodel.js';
+import { registerCars, loadTypes, ensureRealModel } from './js/realcars.js';
+try {
+const cars = await (await fetch('./shared/cars.json')).json(); registerCars(cars);
+const q = new URLSearchParams(location.search); const id = q.get('id') || 'db9v'; const car = cars.find(c => c.id === id);
+await loadTypes(); await ensureRealModel(id);
+const views = (q.get('views') || 'fq,side,rq').split(','); const W = +(q.get('w') || 640), H = +(q.get('h') || 360);
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(W, H * views.length); r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.0; document.body.appendChild(r.domElement);
+r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap; r.setScissorTest(true);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0x9aa3ac);
+const pm = new THREE.PMREMGenerator(r); const env = pm.fromScene(new RoomEnvironment(), 0.04).texture; sc.environment = env; setCarEnv(env);
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(-4, 10, -5); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); for (const k of ['left', 'bottom']) sun.shadow.camera[k] = -6; for (const k of ['right', 'top']) sun.shadow.camera[k] = 6; sc.add(sun);
+const fl = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: 0x6d6f72, roughness: 0.55 })); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; sc.add(fl);
+const opts = { detail: 2, plate: 'CUZZY' }; if (q.get('colour')) opts.colour = +q.get('colour'); if (q.get('wheel')) opts.wheel = q.get('wheel');
+const m = buildCar(car, opts); sc.add(m); m.updateMatrixWorld(true);
+const bb = new THREE.Box3().setFromObject(m); const L = bb.max.z - bb.min.z;
+const cam = new THREE.PerspectiveCamera(30, W / H, 0.05, 200);
+// forward is -Z
+const V = { fq: [0.62, 1.25, 1.2], rq: [Math.PI - 0.62, 1.35, 1.2], side: [Math.PI / 2, 0.7, 1.15], front: [0, 0.8, 1.2], rear: [Math.PI, 0.9, 1.2], top: [0.6, 4.5, 1.6], wheel: [Math.PI / 2 - 0.25, 0.45, 0.62] };
+window.draw = () => views.forEach((v, i) => { const [a, h, d] = V[v] || V.fq; const dist = L * d; const tz = v === 'wheel' ? bb.min.z + L * 0.2 : 0;
+  cam.position.set(-Math.sin(a) * dist, h, -Math.cos(a) * dist + tz); cam.lookAt(0, v === 'wheel' ? 0.35 : 0.55, tz); cam.updateMatrixWorld();
+  const y = (views.length - 1 - i) * H; r.setViewport(0, y, W, H); r.setScissor(0, y, W, H); r.render(sc, cam); }); window.draw();
+let tris = 0; m.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+window.info = { id, key: m.userData.realKey || 'proc', tris: Math.round(tris), size: bb.getSize(new THREE.Vector3()).toArray().map(x => +x.toFixed(3)), paint: (m.userData.paint?.color?.getHexString?.()) };
+} catch (e) { window.err = String(e && e.stack || e); }
+window.done = true;
+</script></body></html>

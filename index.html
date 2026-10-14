@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>CUZZY RACING</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="img/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Saira+Condensed:wght@500;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=cf5bb9d9">
+<script type="importmap">{"imports": {"three": "./js/lib/three.module.js?v=a762b858", "./js/person.js": "./js/person.js?v=68fcabc1", "./js/showroom.js": "./js/showroom.js?v=9026de8d", "./js/streetlife.js": "./js/streetlife.js?v=9d82c410", "./js/gfx.js": "./js/gfx.js?v=609ab038", "./js/rumble.js": "./js/rumble.js?v=bd35ae7e", "./js/carmodel.js": "./js/carmodel.js?v=b5c414b4", "./js/engine-worklet.js": "./js/engine-worklet.js?v=3e9cb6bf", "./js/ai.js": "./js/ai.js?v=454dccd4", "./js/daynight-weather.js": "./js/daynight-weather.js?v=85ba779d", "./js/ui_settings.js": "./js/ui_settings.js?v=26c46093", "./js/cockpit.js": "./js/cockpit.js?v=2826407f", "./js/audio.js": "./js/audio.js?v=c48152b7", "./js/bttf_fx.js": "./js/bttf_fx.js?v=342a2d56", "./js/settings.js": "./js/settings.js?v=38513986", "./js/main.js": "./js/main.js?v=60c1b95c", "./js/kittdash.js": "./js/kittdash.js?v=ce78e011", "./js/chipselect.js": "./js/chipselect.js?v=4e00ce77", "./js/radio.js": "./js/radio.js?v=9673f2da", "./js/uinav.js": "./js/uinav.js?v=877160b3", "./js/nav.js": "./js/nav.js?v=6e902ac3", "./js/hover.js": "./js/hover.js?v=10356874", "./js/voice.js": "./js/voice.js?v=0f6fee94", "./js/game.js": "./js/game.js?v=65d9e45e", "./js/world.js": "./js/world.js?v=3c9f5e96", "./js/g29setup.js": "./js/g29setup.js?v=a3e28fc1", "./js/roadedge.js": "./js/roadedge.js?v=224a2de4", "./js/gadgets.js": "./js/gadgets.js?v=e4b60b3c", "./js/db5int.js": "./js/db5int.js?v=75697a37", "./js/venues.js": "./js/venues.js?v=212e2c21", "./js/realcars.js": "./js/realcars.js?v=1c8d97c2", "./js/store.js": "./js/store.js?v=c00bef1e", "./js/voice-worklet.js": "./js/voice-worklet.js?v=f0562c0b", "./js/onfoot.js": "./js/onfoot.js?v=47c9a512", "./js/landmarks_east.js": "./js/landmarks_east.js?v=c17bf64b", "./js/citylook.js": "./js/citylook.js?v=f0f6ba0e", "./js/ui_auth.js": "./js/ui_auth.js?v=19510d20", "./js/hud.js": "./js/hud.js?v=0f4f5df9", "./js/shadersafe.js": "./js/shadersafe.js?v=47defad8", "./js/wheel.js": "./js/wheel.js?v=48f64be3", "./js/openworld.js": "./js/openworld.js?v=030f7942", "./js/net.js": "./js/net.js?v=e0316a53", "./js/lib/three.module.js": "./js/lib/three.module.js?v=a762b858", "./js/lib/addons/utils/BufferGeometryUtils.js": "./js/lib/addons/utils/BufferGeometryUtils.js?v=00ecb96b", "./js/lib/addons/loaders/RGBELoader.js": "./js/lib/addons/loaders/RGBELoader.js?v=7626b55b", "./js/lib/addons/loaders/OBJLoader.js": "./js/lib/addons/loaders/OBJLoader.js?v=85d84dd8", "./js/lib/addons/loaders/GLTFLoader.js": "./js/lib/addons/loaders/GLTFLoader.js?v=9ad07e47", "./js/lib/addons/objects/Sky.js": "./js/lib/addons/objects/Sky.js?v=e0837a6c", "./js/lib/addons/objects/Reflector.js": "./js/lib/addons/objects/Reflector.js?v=63d3cfe5", "./js/lib/addons/postprocessing/AfterimagePass.js": "./js/lib/addons/postprocessing/AfterimagePass.js?v=fcef38e6", "./js/lib/addons/postprocessing/ShaderPass.js": "./js/lib/addons/postprocessing/ShaderPass.js?v=f145da64", "./js/lib/addons/postprocessing/OutputPass.js": "./js/lib/addons/postprocessing/OutputPass.js?v=8ca54f44", "./js/lib/addons/postprocessing/GTAOPass.js": "./js/lib/addons/postprocessing/GTAOPass.js?v=051e4045", "./js/lib/addons/postprocessing/MaskPass.js": "./js/lib/addons/postprocessing/MaskPass.js?v=10b721db", "./js/lib/addons/postprocessing/UnrealBloomPass.js": "./js/lib/addons/postprocessing/UnrealBloomPass.js?v=a60d7378", "./js/lib/addons/postprocessing/SMAAPass.js": "./js/lib/addons/postprocessing/SMAAPass.js?v=9a8bf09a", "./js/lib/addons/postprocessing/Pass.js": "./js/lib/addons/postprocessing/Pass.js?v=a5ec37ce", "./js/lib/addons/postprocessing/EffectComposer.js": "./js/lib/addons/postprocessing/EffectComposer.js?v=eccf8177", "./js/lib/addons/postprocessing/RenderPass.js": "./js/lib/addons/postprocessing/RenderPass.js?v=89aaff34", "./js/lib/addons/controls/OrbitControls.js": "./js/lib/addons/controls/OrbitControls.js?v=fb493b16", "./js/lib/addons/shaders/AfterimageShader.js": "./js/lib/addons/shaders/AfterimageShader.js?v=db02c7da", "./js/lib/addons/shaders/OutputShader.js": "./js/lib/addons/shaders/OutputShader.js?v=251fcfe4", "./js/lib/addons/shaders/SMAAShader.js": "./js/lib/addons/shaders/SMAAShader.js?v=c611ed21", "./js/lib/addons/shaders/CopyShader.js": "./js/lib/addons/shaders/CopyShader.js?v=6088e45f", "./js/lib/addons/shaders/PoissonDenoiseShader.js": "./js/lib/addons/shaders/PoissonDenoiseShader.js?v=1c34e38d", "./js/lib/addons/shaders/GTAOShader.js": "./js/lib/addons/shaders/GTAOShader.js?v=3a30503b", "./js/lib/addons/shaders/LuminosityHighPassShader.js": "./js/lib/addons/shaders/LuminosityHighPassShader.js?v=05b8a6dd", "./js/lib/addons/environments/RoomEnvironment.js": "./js/lib/addons/environments/RoomEnvironment.js?v=1572ee39", "./js/lib/addons/math/SimplexNoise.js": "./js/lib/addons/math/SimplexNoise.js?v=3149646f", "./js/lib/addons/libs/meshopt_decoder.module.js": "./js/lib/addons/libs/meshopt_decoder.module.js?v=cd7a7b72", "./shared/physics.js": "./shared/physics.js?v=20a2b366", "./shared/perftest.js": "./shared/perftest.js?v=caad4ec8"}}</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- ============ BOOT / LOADING ============ -->
+<section id="boot" class="screen show">
+  <div class="boot-bg"></div>
+  <div class="boot-inner">
+    <svg class="logo" viewBox="0 0 120 40" aria-label="CUZZY RACING logo"><path d="M4 30 L24 8 H60 L50 20 H30 L22 30 Z" fill="currentColor"/><path d="M56 30 L76 8 H116 L106 20 H86 L78 30 Z" fill="none" stroke="currentColor" stroke-width="3"/></svg>
+    <h1 class="title"><span>CUZZY</span> RACING</h1>
+    <p class="sub">Birmingham street racing</p>
+    <div class="load"><div class="bar"><i id="loadbar"></i></div><div class="loadtxt"><span id="loadstep">Starting…</span><span id="loadpct">0%</span></div></div>
+    <button id="tapstart" class="btn big primary" hidden>Tap to start</button>
+    <button id="boot-signin" class="btn big primary" hidden>Sign in to play</button>
+    <p id="booterr" class="err" hidden></p>
+  </div>
+  <p class="credit">Map data © OpenStreetMap contributors (ODbL). Vehicles are fictional designs inspired by real cars — not affiliated with or endorsed by any manufacturer.</p>
+</section>
+
+<!-- ============ SIGN IN / CREATE ACCOUNT (before the main menu) ============ -->
+<section id="auth" class="screen panel-screen" aria-labelledby="auth-title">
+  <div class="boot-bg" aria-hidden="true"></div>
+  <header class="ph"><button class="back" id="auth-back" type="button">‹ Back</button><h2 id="auth-title">Sign in</h2></header>
+  <div class="pbody narrow auth-body">
+    <div class="auth-side">
+      <div class="brand auth-brand"><svg class="logo" viewBox="0 0 120 40" aria-hidden="true"><path d="M4 30 L24 8 H60 L50 20 H30 L22 30 Z" fill="currentColor"/><path d="M56 30 L76 8 H116 L106 20 H86 L78 30 Z" fill="none" stroke="currentColor" stroke-width="3"/></svg><div class="brand-t"><div class="title sm"><span>CUZZY</span> RACING</div><div class="brand-tag"><span class="stk">0121</span><span>Sign in · ride out</span></div></div></div>
+      <div class="auth-tabs" role="tablist" aria-label="Account"><button type="button" class="chip on" role="tab" data-am="login" aria-selected="true">Sign in</button><button type="button" class="chip" role="tab" data-am="register" aria-selected="false">Create account</button></div>
+      <div class="warnbox" id="auth-norecover" hidden><b>No password recovery.</b> Accounts have no email address, so a forgotten password can't be reset — you'd need a new account and would start again. Use a password manager or write it down somewhere safe.</div>
+      <p class="note auth-note">Your garage, credits and settings are saved to your account on the CUZZY RACING server, so you stay signed in on this device and can sign in on any other. Voice chat is relayed by the game server — other players never see your IP address.</p>
+    </div>
+    <form id="auth-form" novalidate autocomplete="on">
+      <label class="lbl">Username<input id="auth-user" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="16" enterkeyhint="next" inputmode="text"></label>
+      <small class="hint" id="auth-user-hint" hidden>3–16 letters, numbers or _ — this is your driver name in races and chat</small>
+      <label class="lbl">Password<span class="pw-row"><input id="auth-pass" type="password" name="password" autocomplete="current-password" maxlength="128" enterkeyhint="go"><button type="button" class="btn small ghost" id="auth-show" aria-pressed="false">Show</button></span></label>
+      <small class="hint" id="auth-pass-hint" hidden>At least 8 characters</small>
+      <label class="lbl" id="auth-pass2-wrap" hidden>Confirm password<input id="auth-pass2" type="password" name="password2" autocomplete="new-password" maxlength="128" enterkeyhint="go"></label>
+      <p class="err" id="auth-err" role="alert" hidden></p>
+      <button class="btn primary" id="auth-go" type="submit">Sign in</button>
+    </form>
+  </div>
+</section>
+
+<!-- intro title overlay -->
+<div id="introtitle" hidden><div class="it-inner"><div class="it-kicker">BIRMINGHAM · WEST MIDLANDS</div><div class="it-title"><span>CUZZY</span> RACING</div></div><button id="skipintro" class="btn ghost small">Skip ›</button></div>
+
+<!-- ============ MAIN MENU ============ -->
+<section id="menu" class="screen">
+  <div class="menu-side">
+    <div class="brand"><svg class="logo" viewBox="0 0 120 40" aria-hidden="true"><path d="M4 30 L24 8 H60 L50 20 H30 L22 30 Z" fill="currentColor"/><path d="M56 30 L76 8 H116 L106 20 H86 L78 30 Z" fill="none" stroke="currentColor" stroke-width="3"/></svg><div class="brand-t"><div class="title sm"><span>CUZZY</span> RACING</div><div class="brand-tag"><span class="stk">0121</span><span>Brum streets · no limits</span></div></div></div>
+    <nav class="menu-list" aria-label="Main menu">
+      <button class="mi hero" data-go="solo"><b>Play Solo</b><small>Free roam, sprints, circuits, time trials</small></button>
+      <button class="mi" data-go="online"><b>Play Online</b><small>Public match, up to 8 drivers</small></button>
+      <button class="mi" data-go="world"><b>Open World</b><small>Roam the city, chat, link up with 8 drivers</small></button>
+      <button class="mi" data-go="create"><b>Create Room</b><small>Private invite code for your mandem</small></button>
+      <button class="mi" data-go="join"><b>Join Room</b><small>Got a code? Get in</small></button>
+      <button class="mi" data-go="showroom"><b>Showroom</b><small>Browse and pick your whip — all free</small></button>
+      <button class="mi" data-go="upgrade"><b>Garage</b><small>Upgrades, paint, rims, tint</small></button>
+      <button class="mi" data-go="settings"><b>Settings</b><small>Sound, voice, graphics, controls</small></button>
+      <button class="mi" data-go="howto"><b>How to Play</b><small>Controls and tutorial</small></button>
+      <button class="mi" data-go="feedback"><b>Message the Developer</b><small>Report a bug, suggest an idea, say hello</small></button>
+      <button class="mi" id="mi-fullscreen" type="button"><b>Full Screen</b><small>Hide the address bar — iPhone: Add to Home Screen</small></button>
+      <button class="mi" data-go="credits"><b>Credits</b><small>The team and the licences</small></button>
+    </nav>
+  </div>
+  <svg class="skyline" viewBox="0 0 600 120" preserveAspectRatio="xMaxYMax meet" aria-hidden="true"><path fill="currentColor" d="M0 120V96h28V78h22v18h16V60h30v36h14V70h10V40h6v30h10v26h20V84h34V48c0-6 40-6 40 0v48h12V66h26v30h18V30h8l4-18 4 18h8v66h20V74l24-12 24 12v22h14V58h46v38h18V80h16V52h28v44h26V70h18v26h24V88h26v32z"/></svg>
+  <div class="menu-foot"><div class="mf-card"><div id="mf-car"></div><div class="wallet" aria-label="Credits"><span id="mf-credits">—</span> cr</div></div><div id="savestate" class="savestate"></div><div class="postcode" aria-hidden="true">B5 · DIGBETH · BULLRING · ROTUNDA</div></div>
+</section>
+
+<!-- ============ GENERIC PANEL SCREENS ============ -->
+<section id="solo" class="screen panel-screen">
+  <header class="ph"><button class="back">‹ Back</button><h2>Play Solo</h2></header>
+  <div class="pbody">
+    <h3>Mode</h3><div class="chips" id="solo-mode"></div>
+    <div id="solo-route-wrap"><h3>Route</h3><div class="cards" id="solo-route"></div></div>
+    <div class="row2"><div id="solo-laps-wrap"><h3>Laps</h3><div class="chips" id="solo-laps"></div></div>
+    <div><h3>Time of day</h3><div class="chips" id="solo-time"></div></div>
+    <div><h3>Weather</h3><div class="chips" id="solo-weather"></div></div></div>
+    <p class="note" id="solo-note"></p>
+  </div>
+  <footer class="pf"><div class="pf-car" id="solo-car"></div><button class="btn ghost" data-go="showroom">Change car</button><button class="btn primary" id="solo-go">Drive</button></footer>
+</section>
+
+<section id="feedback" class="screen panel-screen">
+  <header class="ph"><button class="back">‹ Back</button><h2>Message the Developer</h2></header>
+  <div class="pbody narrow">
+    <h3>What is it about?</h3><div class="chips" id="fb-kind"><button class="chip on" data-k="bug">Bug</button><button class="chip" data-k="idea">Idea</button><button class="chip" data-k="cars">Cars</button><button class="chip" data-k="other">Other</button></div>
+    <h3>Your message</h3><textarea id="fb-msg" maxlength="2000" rows="6" placeholder="What happened, or what would you like to see? The more detail the better." style="width:100%;box-sizing:border-box;background:transparent;color:inherit;border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:12px;font:inherit;resize:vertical;min-height:120px;height:120px;display:block"></textarea>
+    <p class="note" id="fb-note">Your username (if signed in), device and game screen are sent with the message so it can be fixed. Nothing else.</p>
+  </div>
+  <footer class="pf"><button class="btn primary" id="fb-send">Send</button></footer>
+</section>
+
+<section id="join" class="screen panel-screen">
+  <header class="ph"><button class="back">‹ Back</button><h2>Join Private Room</h2></header>
+  <div class="pbody narrow">
+    <p class="note">Driving as <b id="join-as" class="drv-as"></b></p>
+    <label class="lbl">Invite code<input id="join-code" maxlength="5" class="code-in" autocapitalize="characters" autocomplete="off" placeholder="ABCDE"></label>
+    <p class="err" id="join-err" hidden></p>
+    <button class="btn primary" id="join-go">Join room</button>
+  </div>
+</section>
+
+<section id="world" class="screen panel-screen">
+  <header class="ph"><button class="back">‹ Back</button><h2>Online Open World</h2></header>
+  <div class="pbody narrow">
+    <p class="note">Drive anywhere in Birmingham with other real players in your own car. Everyone starts at the City car park meet. Chat by text or by voice (relayed by the game server, so nobody sees your IP), meet up with a tap, and start a race whenever you like — you come back to the open world after.</p>
+    <p class="note" id="ow-online"></p>
+    <p class="note">Driving as <b id="ow-as" class="drv-as"></b></p>
+    <button class="btn primary" id="ow-public">Join public open world</button>
+    <button class="btn" id="ow-private">Create private open world</button>
+    <div class="ow-coderow"><input id="ow-code" maxlength="5" class="code-in" autocapitalize="characters" autocomplete="off" placeholder="CODE" aria-label="Invite code"><button class="btn" id="ow-join">Join with code</button></div>
+    <p class="err" id="ow-err" hidden></p>
+  </div>
+</section>
+
+<section id="lobby" class="screen panel-screen">
+  <header class="ph"><button class="back" id="lobby-leave">‹ Leave room</button><h2 id="lobby-title">Room</h2><div class="codebox" id="lobby-codebox"><span>Invite code</span><b id="lobby-code">—</b><button class="btn ghost small" id="lobby-copy">Copy invite</button></div></header>
+  <div class="pbody lobby-grid">
+    <div>
+      <h3>Players <span id="lobby-count"></span></h3>
+      <ul class="plist" id="lobby-players"></ul>
+      <div class="voicebar" id="lobby-voice"></div>
+    </div>
+    <div>
+      <h3>Race settings <small id="lobby-hostnote"></small></h3>
+      <div id="lobby-settings"></div>
+      <h3>Your car</h3>
+      <div class="carpick" id="lobby-car"></div>
+    </div>
+  </div>
+  <div class="timeout" id="lobby-timeout"></div>
+  <footer class="pf"><button class="btn ghost" id="lobby-keep">Keep room open</button><button class="btn" id="lobby-ready">Ready</button><button class="btn primary" id="lobby-start">Start</button></footer>
+</section>
+
+<section id="showroom" class="screen panel-screen see-through">
+  <header class="ph"><button class="back">‹ Back</button><h2>Showroom</h2><div class="wallet"><span class="credits">—</span> cr</div></header>
+  <div class="sr">
+    <aside class="sr-list">
+      <div class="sr-listh"><div class="sr-count" id="sr-count"></div><button class="btn ghost small" id="sr-filt" aria-expanded="false" aria-controls="sr-filters">Filters</button></div>
+      <div class="filters" id="sr-filters">
+        <chip-select id="f-cat" aria-label="Category"></chip-select><chip-select id="f-make" aria-label="Make"></chip-select><chip-select id="f-drive" aria-label="Drivetrain"></chip-select>
+      </div>
+      <ul id="sr-cars"></ul>
+    </aside>
+    <div class="sr-stage">
+      <div class="sr-tools"><button class="btn ghost small" id="sr-interior" aria-pressed="false">Interior</button><button class="btn ghost small" id="sr-sound">Engine sound</button><button class="btn ghost small" id="sr-compare">Compare</button><span class="hint">Drag to rotate · pinch/scroll to zoom</span></div>
+      <div class="sr-swatches" id="sr-swatches"></div>
+    </div>
+    <aside class="sr-detail" id="sr-detail"></aside>
+  </div>
+</section>
+
+<section id="upgrade" class="screen panel-screen see-through">
+  <header class="ph"><button class="back">‹ Back</button><h2>Garage</h2><div class="ph-car" id="up-carslot"></div><div class="wallet" aria-label="Credits"><span class="credits">—</span> cr</div></header>
+  <div class="up" id="up-body"></div>
+</section>
+
+<section id="settings" class="screen panel-screen">
+  <header class="ph"><button class="back">‹ Back</button><h2>Settings</h2><div class="savestate" id="set-save"></div></header>
+  <div class="tabs" id="set-tabs"></div>
+  <div class="pbody" id="set-body"></div>
+  <footer class="pf"><button class="btn ghost" id="set-defaults">Restore defaults</button></footer>
+</section>
+
+<section id="howto" class="screen panel-screen">
+  <header class="ph"><button class="back">‹ Back</button><h2>How to Play</h2></header>
+  <div class="pbody" id="howto-body"></div>
+  <footer class="pf"><button class="btn primary" id="howto-tut">Play the tutorial</button></footer>
+</section>
+
+<section id="credits" class="screen panel-screen">
+  <header class="ph"><button class="back">‹ Back</button><h2>Credits</h2></header>
+  <div class="pbody cr-body">
+    <figure class="cr-photo"><img src="img/credits_team.webp" width="750" height="1000" alt="Two cats on a cat tree" decoding="async"><figcaption>Shakil Mirza &amp; Perplexity Computer — the team behind CUZZY RACING</figcaption></figure>
+    <div class="cr-text">
+      <p class="cr-kicker">Made in Brum · 0121</p>
+      <h3 class="cr-big">Created by <span>Shak</span></h3>
+      <p class="cr-built">of R2G2 Development House</p>
+      <h4>Credits</h4>
+      <ul><li><b>Game design &amp; direction</b> — Shak / R2G2 Development House</li><li><b>Cars, map &amp; world</b> — Shak / R2G2 Development House</li><li><b>Art &amp; visual direction</b> — Shak / R2G2 Development House</li><li><b>Code direction</b> — Shak / R2G2 Development House</li><li><b>Sound design</b> — Shak / R2G2 Development House</li><li><b>Radio music</b> — all stations and tracks: 0121 GRIME FM (grime), B-TOWN R&amp;B (R&amp;B) and DISCO 80 GOLD (80s disco) — written and produced by Shak / R2G2 Development House</li></ul>
+      <p class="note">Radio DJ and artist names heard in the game are fictional. © 2026 Shak / R2G2 Development House.</p>
+      <h4>Third-party licences</h4>
+      <p class="note">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, available under the <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">Open Database Licence (ODbL) 1.0</a>; the Birmingham map (<code>brum.json</code>) is a Derived Database of OSM data.</p>
+      <p class="note"><b>“Car Concept”</b> by Eric Chadwick / Darmstadt Graphics Group GmbH (2024), from the <a href="https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept" target="_blank" rel="noopener">Khronos glTF Sample Assets</a>, based on the CC0 “Free Concept Car 004” by Unity Fan — <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>, modified (logos removed, compressed). Body-type car models from <a href="https://3dassets.dev" target="_blank" rel="noopener">3D Assets (3dassets.dev)</a> — <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0 1.0</a>, credited as a courtesy.</p>
+      <p class="note">three.js r160 and addons (MIT); FastAPI (MIT) and Uvicorn (BSD-3-Clause) on the server; Playwright (Apache-2.0) for tests only; fonts Anton, Saira Condensed and Barlow (SIL Open Font Licence 1.1, Google Fonts).</p>
+      <p class="note">Made with AI-assisted tools: loading-screen art and east-side landmark textures were AI-generated from our own prompts, and the intro voice is AI text-to-speech. Engine, tyre, UI sounds and radio music are synthesised in code — no samples or recordings. Vehicles are fictional designs inspired by real cars — not affiliated with or endorsed by any manufacturer.</p>
+    </div>
+  </div>
+</section>
+
+<section id="results" class="screen panel-screen">
+  <header class="ph"><h2 id="res-title">Results</h2></header>
+  <div class="pbody narrow" id="res-body"></div>
+  <footer class="pf" id="res-foot"></footer>
+</section>
+
+<!-- ============ IN-GAME ============ -->
+<div id="hud" hidden>
+  <div class="h-top">
+    <button class="hbtn" id="h-pause" aria-label="Pause">❚❚</button>
+    <div id="ow-bar" hidden><button class="hbtn wide" data-ow="chat">Chat</button><button class="hbtn wide" data-ow="meet">Meet up</button><button class="hbtn wide" data-ow="race">Race</button><button class="hbtn wide" data-ow="voice">Voice</button></div>
+    <div class="h-box" id="h-lapbox"><b id="h-lap"></b><small id="h-cp"></small></div>
+    <div class="h-box" id="h-timebox"><b id="h-time">0:00.00</b></div>
+    <div class="h-box"><b id="h-pos">1/1</b><small>POS</small></div>
+    <div id="fps" hidden></div>
+  </div>
+  <div id="h-guide" hidden aria-hidden="true"><div id="h-guide-chev"></div><small id="h-guide-d"></small></div>
+  <canvas id="minimap" width="320" height="320"></canvas>
+  <div class="h-speedo">
+    <div id="h-rev" class="revwrap"><div class="rev" id="h-revbar"></div><small id="h-rpm"></small></div>
+    <div id="h-ev" class="revwrap" hidden><div class="ev" id="h-evbar"></div><small id="h-kw"></small><small id="h-soc"></small></div>
+    <div class="spd"><b id="h-speed">0</b><small id="h-unit">mph</small></div><div class="gear" id="h-gear">N</div>
+  </div>
+  <div id="countdown" hidden></div>
+  <div id="flash"></div>
+  <div id="warnbar" hidden></div>
+  <div id="netbar" hidden></div>
+  <div id="toasts"></div>
+  <div id="tags"></div>
+  <div id="ow-log" hidden></div>
+  <div id="ow-inv" hidden></div>
+  <div id="tut" hidden><p id="tut-text"></p><button class="btn ghost small" id="tut-skip">Skip tutorial</button></div>
+</div>
+<div id="touch" hidden>
+  <div class="tc left">
+    <button data-k="left" class="tb steer" aria-label="Steer left">◀</button><button data-k="right" class="tb steer" aria-label="Steer right">▶</button>
+    <div id="wheel" aria-label="Steering wheel"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" stroke-width="8"/><path d="M8 52 H92 M50 52 V92" stroke="currentColor" stroke-width="8"/><circle cx="50" cy="52" r="10" fill="currentColor"/></svg></div>
+  </div>
+  <div class="tc right">
+    <button data-k="brake" class="tb pedal brake" aria-label="Brake / reverse">BRAKE</button>
+    <button data-k="gas" class="tb pedal gas" aria-label="Accelerate">GAS</button>
+  </div>
+  <div class="tc aux">
+    <div id="h-shift"><button data-k="down" class="tb small" aria-label="Shift down">−</button><button data-k="up" class="tb small" aria-label="Shift up">+</button></div>
+    <button data-k="hb" class="tb small" aria-label="Handbrake">HB</button>
+    <button data-k="rev" class="tb small" aria-label="Reverse">R</button>
+    <button data-k="fly" class="tb small util" id="h-fly" aria-label="Hover mode" hidden>FLY</button>
+    <button data-k="turbo" class="tb small util" id="h-turbo" aria-label="Turbo boost" hidden>TURBO</button>
+    <button data-k="cam" class="tb small util" aria-label="Camera">CAM</button>
+    <button data-k="reset" class="tb small util" aria-label="Reset car">↺</button>
+    <button data-k="mic" class="tb small mic util" id="h-mic" aria-label="Microphone on/off">MIC OFF</button>
+  </div>
+</div>
+
+<div id="pause" class="overlay" hidden>
+  <div class="pause-card">
+    <h2>Paused</h2><p class="online-note" id="pause-online" hidden>Online session continues. Your car is braking to a stop while this menu is open.</p>
+    <div class="pause-btns">
+      <button class="btn primary" id="p-resume">Resume</button>
+      <button class="btn" id="p-restart">Restart</button>
+      <button class="btn" id="p-settings">Settings</button>
+      <button class="btn" id="p-players">Players &amp; voice</button>
+      <button class="btn" id="p-leave">Leave race</button>
+      <button class="btn danger" id="p-menu">Return to Main Menu</button>
+    </div>
+    <div class="radio-slot" id="radio-slot-pause"></div>
+    <div id="p-extra"></div>
+  </div>
+</div>
+<div id="ow-panel" class="overlay" hidden><div class="modal-card ow-card"><div class="ow-head"><button class="back btn small ghost" id="ow-back">‹ Back</button><h3 id="ow-title"></h3></div><div id="ow-body"></div></div></div>
+<div id="modal" class="overlay" hidden><div class="modal-card"><h3 id="m-title"></h3><div id="m-body"></div><div class="m-btns" id="m-btns"></div></div></div>
+<div id="busy" hidden><div class="spin"></div><span id="busy-t">Loading…</span></div>
+<div id="rotate" hidden>Turn your phone sideways for the best view</div>
+
+<script type="module">import "./js/main.js";</script>
+<script src="https://gamestats.pplx.app/t.js" data-g="cuzzy"></script>
+</body>
+</html>

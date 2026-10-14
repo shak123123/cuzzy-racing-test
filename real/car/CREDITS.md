@@ -1,0 +1,1 @@
+- car_dmc12.glb — "1985 DeLorean DMC-12 Time Machine BTTF" by ddiaz-design — https://sketchfab.com/3d-models/c6d865257d344523be373f543323ae18 (simplified, textures resized; Back to the Future design is Universal Pictures IP)
