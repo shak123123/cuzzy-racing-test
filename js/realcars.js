@@ -14,7 +14,7 @@ import { mergeGeometries } from './lib/addons/utils/BufferGeometryUtils.js';
 const BASE = './real/car/';
 // bespoke first-game models for their own cars; every other car borrows a model by body type (see keyFor)
 const MODEL_OF = { db9v: 'db9', rrs23: 'rrs', rrsd300: 'rrs', box986: 'box' };
-const PROCEDURAL = new Set(['gti8']); // no realistic free Golf model: gti8 keeps its detailed procedural Mk8 body (carmodel.js)
+const PROCEDURAL = new Set(['gti8', 'r6a']); // no realistic free Golf model: gti8 keeps its detailed procedural Mk8 body (carmodel.js)
 const NATIVE = new Set(['db9', 'rrs', 'box']);
 // nearest body types (used when the per-type model for a car's own body type is missing)
 const NEAR = { hatch3: ['hatch5', 'classicmini', 'boxy'], hatch5: ['hatch3', 'estate', 'crossover', 'boxy'], classicmini: ['hatch3', 'boxy', 'hatch5'],

@@ -180,6 +180,15 @@ const TOD = {
   night: { zen: 0x03060e, hor: 0x1c2436, gnd: 0x0a0a0c, sky: 0x0b1020, fog: 0x121826, hemi: [0x4a5a80, 0x151515, 0.35], sun: [0x8aa0ff, 0.25], sunPos: [-200, 400, -300], exp: 1.25 },
 };
 
+// look: 3D colour LUT stored as a 256 x 16 strip (b slices left to right), applied to the display-referred colour
+let _lut = null; function lutTex() { if (_lut) return _lut; _lut = new THREE.TextureLoader().load('./img/city/lut_uk_overcast.png'); _lut.minFilter = _lut.magFilter = THREE.LinearFilter; _lut.generateMipmaps = false; _lut.colorSpace = THREE.NoColorSpace; return _lut; }
+const LutShader = { uniforms: { tDiffuse: { value: null }, lut: { value: null }, amt: { value: 1 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform sampler2D lut; uniform float amt; varying vec2 vUv;
+  vec3 lk( vec3 c ) { float N = 16.0; c = clamp( c, 0.0, 1.0 ); float b = c.b * ( N - 1.0 ); float b0 = floor( b ), b1 = min( b0 + 1.0, N - 1.0 );
+    vec2 uv = vec2( ( c.r * ( N - 1.0 ) + 0.5 ) / ( N * N ), ( c.g * ( N - 1.0 ) + 0.5 ) / N ); uv.y = 1.0 - uv.y;
+    return mix( texture2D( lut, uv + vec2( b0 / N, 0.0 ) ).rgb, texture2D( lut, uv + vec2( b1 / N, 0.0 ) ).rgb, b - b0 ); }
+  void main() { vec4 t = texture2D( tDiffuse, vUv ); gl_FragColor = vec4( mix( t.rgb, lk( t.rgb ), amt ), t.a ); }` };
 export class Gfx {
   constructor(canvas, settings) {
     this.s = settings; this.canvas = canvas;
@@ -191,7 +200,7 @@ export class Gfx {
       d.innerHTML = '<div><b>3D graphics are switched off in this browser</b><br>Turn on hardware acceleration (Chrome: Settings, System, Use graphics acceleration), close other heavy tabs, then reload. Safari and Chrome both work.<br><br><button onclick="location.reload()" style="background:transparent;color:#fff;border:1px solid #fff;border-radius:8px;padding:8px 18px;font:inherit">Reload</button></div>';
       document.body.appendChild(d); throw new Error('WebGL unavailable (handled): ' + (this.glErr && this.glErr.message));
     }
-    this.r.outputColorSpace = THREE.SRGBColorSpace; this.r.toneMapping = THREE.ACESFilmicToneMapping; this.r.toneMappingExposure = 1;
+    this.r.outputColorSpace = THREE.SRGBColorSpace; this.r.toneMapping = /[?&]aces=1/.test(location.search) ? THREE.ACESFilmicToneMapping : THREE.AgXToneMapping; // look: AgX (softer highlight roll-off, less 'video game' saturation) this.r.toneMappingExposure = 1;
     this.r.shadowMap.type = THREE.PCFSoftShadowMap; this.r.shadowMap.autoUpdate = false; // shadow map drawn once per frame (render()), not again for the probe face / GTAO normals / transmission renders
     const gl = this.r.getContext(); const dbg = gl.getExtension('WEBGL_debug_renderer_info');
     this.gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'unknown GPU'; this.webgl2 = this.r.capabilities.isWebGL2;
@@ -215,6 +224,7 @@ export class Gfx {
     this.apply();
     // first-game sky: photographic HDR environment (lighting + reflections) and a matching photo sky backdrop, used for clear daytime
     new RGBELoader().load('./real/tex/sky1k.hdr', t => { t.mapping = THREE.EquirectangularReflectionMapping; const pm = new THREE.PMREMGenerator(this.r); this.hdrEnv = pm.fromEquirectangular(t).texture; pm.dispose(); t.dispose(); this.setTOD(this.tod, this.rainOn); });
+    new RGBELoader().load('./real/tex/overcast1k.hdr', t => { t.mapping = THREE.EquirectangularReflectionMapping; const pm = new THREE.PMREMGenerator(this.r); this.ocEnv = pm.fromEquirectangular(t).texture; pm.dispose(); this.ocSky = t; this.setTOD(this.tod, this.rainOn); }); // look: Poly Haven kloofendal_overcast_puresky (CC0), British-style flat overcast
     new THREE.TextureLoader().load('./real/tex/skybg.jpg', t => { t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace; this.skyPhoto = t; this.setTOD(this.tod, this.rainOn); });
   }
   resize() {
@@ -283,7 +293,7 @@ export class Gfx {
       const hp = b.materialHighPassFilter; hp.fragmentShader = withSafe(hp.fragmentShader.replace('vec4 texel = texture2D( tDiffuse, vUv );', 'vec4 texel = texture2D( tDiffuse, vUv ); texel.rgb = min( czSafe3( texel.rgb ), vec3( 24.0 ) ); texel.a = czSafe1( texel.a, 1.0 );')); hp.needsUpdate = true;
       c.addPass(b); }
     if (g.motionBlur) { this.blur = new AfterimagePass(0.55); c.addPass(this.blur); }
-    const op = new OutputPass(); if (CZ_SAFE) patchOutput(op); else { op.material.uniforms.czPx = { value: new THREE.Vector2() }; op.material.fragmentShader = op.material.fragmentShader.replace('gl_FragColor = texture2D( tDiffuse, vUv );', 'gl_FragColor = texture2D( tDiffuse, vUv ); if ( !( abs( gl_FragColor.r ) + abs( gl_FragColor.g ) + abs( gl_FragColor.b ) < 1e30 ) ) gl_FragColor = vec4( 0.0, 0.0, 0.0, 1.0 );'); } this.outPass = op; c.addPass(op); // NaN repaired from neighbours, Inf = bright (the old guard painted both black)
+    const op = new OutputPass(); if (CZ_SAFE) patchOutput(op); else { op.material.uniforms.czPx = { value: new THREE.Vector2() }; op.material.fragmentShader = op.material.fragmentShader.replace('gl_FragColor = texture2D( tDiffuse, vUv );', 'gl_FragColor = texture2D( tDiffuse, vUv ); if ( !( abs( gl_FragColor.r ) + abs( gl_FragColor.g ) + abs( gl_FragColor.b ) < 1e30 ) ) gl_FragColor = vec4( 0.0, 0.0, 0.0, 1.0 );'); } this.outPass = op; c.addPass(op); if (g.envDetail >= (MOB ? 2 : 1) && !/[?&]nolut=1/.test(location.search)) { this.lutPass = new ShaderPass(LutShader); this.lutPass.uniforms.lut.value = lutTex(); c.addPass(this.lutPass); } // look: UK-overcast colour grade LUT (16^3 strip) // NaN repaired from neighbours, Inf = bright (the old guard painted both black)
     this.grade = null; if (hi && fx >= 1) this.grade = foldGrade(op); // filmic grade in display space, folded into the output pass (one full-screen pass less)
     if (g.aa === 'smaa') c.addPass(new SMAAPass(innerWidth * this.r.getPixelRatio(), innerHeight * this.r.getPixelRatio()));
     this.upPass = null; if (this.upMode() === 'sharp') { this.upPass = new ShaderPass(UpscaleShader); this.upPass.uniforms.sharp.value = g.upSharp ?? 0.8; c.addPass(this.upPass); } // last: draws the full-res canvas
@@ -292,7 +302,7 @@ export class Gfx {
   // p51 continuous day/night + weather: o = Environment.out (daynight-weather.js), hour 0..24. Uses this renderer's own
   // presets (setTOD) for the heavy state (sky model, env map, lamps, rain) and blends light, fog and sun position every frame.
   setClock(o, hour) { const rain = o.rain > 0.35; const name = o.night > 0.8 ? 'night' : (o.dusk > 0.4 || o.day < 0.6) ? 'sunset' : 'day';
-    if (name !== this.tod || rain !== this.rainOn || !this.fogD0) { this.setTOD(name, rain); this.fogD0 = this.scene.fog.density; this.clockEnvH = hour; }
+    const ov = !rain && o.cloud > 0.6 && name !== 'night'; /* overcast: grey sky dome, no photo/physical blue sky */ if (name !== this.tod || rain !== this.rainOn || ov !== !!this.ovOn || !this.fogD0) { this.setTOD(name, rain, ov); this.fogD0 = this.scene.fog.density; this.clockEnvH = hour; }
     this.dynTOD = false; this.hour = hour;
     if (this.physSky) { this.placeSun(); if (Math.abs(hour - (this.clockEnvH ?? hour)) > 0.5) { this.clockEnvH = hour; const g = this.s.graphics; this.cityEnv = this.makeSkyEnv(this.tod); if (g.reflections >= 1) this.scene.environment = this.cityEnv; if (g.reflections >= 1 && !this.cube) setCarEnv(this.cityEnv); } }
     else if (this.sunOff && o.lightDir) { this.sunOff.copy(o.lightDir).multiplyScalar(300); }
@@ -300,8 +310,8 @@ export class Gfx {
     this.scene.fog.density = this.fogD0 * (1 + o.fog * 5 + o.cloud * 0.4); if (this.fogBase) { this.fogBase.copy(this.scene.fog.color); if (o.fog > 0.2 && !this.night) this.scene.fog.color.lerp(this._fogG || (this._fogG = new THREE.Color(0xa9aeb5)), o.fog * 0.5); }
     if (this.dome?.visible) { const U = this.dome.material.uniforms; const gr = this._skyG || (this._skyG = new THREE.Color(0x7d848d)); U.zen.value.lerp(gr, o.cloud * 0.05); U.hor.value.lerp(gr, o.cloud * 0.03); }
   }
-  setTOD(name, rain) {
-    this.tod = name; this.rainOn = rain; const T = TOD[name] || TOD.day; const g = this.s.graphics;
+  setTOD(name, rain, ov = false) {
+    this.tod = name; this.rainOn = rain; this.ovOn = ov; const wetSky = rain; rain = rain || ov; /* overcast shares the grey-sky path; rain-only bits use wetSky */ const T = TOD[name] || TOD.day; const g = this.s.graphics;
     const skyC = new THREE.Color(T.sky); const fogC = new THREE.Color(T.fog);
     if (rain) { skyC.lerp(new THREE.Color(0x6b7480), 0.65); fogC.lerp(new THREE.Color(0x7a828c), 0.6); }
     this.scene.background = skyC; this.scene.fog.color = fogC;
@@ -313,27 +323,29 @@ export class Gfx {
       fragmentShader: 'uniform vec3 zen; uniform vec3 hor; uniform vec3 fog; varying vec3 vP; void main(){ float h = normalize(vP).y; vec3 c = mix(hor, zen, pow(clamp(h,0.0,1.0), 0.55)); c = mix(fog, c, smoothstep(-0.02, 0.12, h)); gl_FragColor = vec4(c,1.0); }' }));
       this.dome.frustumCulled = false; this.dome.renderOrder = -10; this.dome.scale.setScalar(1000); this.scene.add(this.dome); }
     this.dome.material.uniforms.zen.value.copy(zen); this.dome.material.uniforms.hor.value.copy(hor); this.dome.material.uniforms.fog.value.copy(fogC);
-    const hi = g.envDetail >= 2; this.physSky = hi && !rain && name !== 'night'; // High+: physically based sky + sun
+    const hi = g.envDetail >= 2; this.overcast = name === 'day' && !rain && !!this.ocEnv && !/[?&]clear=1/.test(location.search); this.physSky = hi && !rain && name !== 'night' && !this.overcast; // High+: physically based sky + sun
     this.hour = TOD_HOUR[name] ?? 13.4; this.hour0 = this.hour;
     const photo = !this.physSky && name === 'day' && !rain && this.skyPhoto && this.hdrEnv; // Low/Medium clear day: first-game photo sky + HDR lighting
     this.dome.visible = !photo && !this.physSky; if (photo) { this.scene.background = this.skyPhoto; this.scene.backgroundIntensity = 1.0; this.scene.backgroundBlurriness = 0; }
     if (this.physSky) { this.ensureSky(); this.skyParams(name); this.sky.visible = true; this.scene.background = null; } else if (this.sky) this.sky.visible = false;
     this.cityEnv = photo ? this.hdrEnv : this.physSky ? this.makeSkyEnv(name) : this.makeCityEnv(name, rain, zen, hor, new THREE.Color(T.gnd)); if (g.reflections >= 1 && !this.cube) { setCarEnv(this.cityEnv); } if (g.reflections >= 1) this.scene.environment = this.cityEnv;
+    if (this.overcast) { this.dome.visible = false; this.scene.background = this.ocSky; this.scene.backgroundIntensity = 0.9; this.scene.backgroundBlurriness = 0; this.cityEnv = this.ocEnv; if (g.reflections >= 1 && !this.cube) setCarEnv(this.ocEnv); if (g.reflections >= 1) this.scene.environment = this.ocEnv; }
     // haze density: light on a clear day (~18% at 500 m), thicker at night and much thicker in rain (~40% at 200 m)
-    this.scene.fog.density = rain ? 0.0032 : name === 'night' ? 0.0013 : name === 'sunset' ? 0.001 : 0.0008 * Math.max(1, 1300 / g.drawDist);
+    this.scene.fog.density = wetSky ? 0.0032 : ov ? 0.0016 : name === 'night' ? 0.0013 : name === 'sunset' ? 0.001 : 0.0008 * Math.max(1, 1300 / g.drawDist);
     this.hemi.color.set(T.hemi[0]); this.hemi.groundColor.set(T.hemi[1]); this.hemi.intensity = T.hemi[2] * (rain ? 0.8 : 1);
-    this.sun.color.set(T.sun[0]); this.sun.intensity = T.sun[1] * (rain ? 0.35 : 1); this.sunOff = new THREE.Vector3(...T.sunPos).normalize().multiplyScalar(300);
+    this.sun.color.set(T.sun[0]); this.sun.intensity = T.sun[1] * (wetSky ? 0.35 : ov ? 0.5 : 1); this.sunOff = new THREE.Vector3(...T.sunPos).normalize().multiplyScalar(300);
+    if (this.overcast) { this.sun.color.set(0xf3f1ec); this.sun.intensity = 1.4; this.hemi.color.set(0xd9dee4); this.hemi.groundColor.set(0x4a4744); this.hemi.intensity = g.reflections >= 1 ? 0.35 : 1.1; this.sunOff = new THREE.Vector3(220, 560, 260).normalize().multiplyScalar(300); this.scene.fog.color.set(0xb9bec4); this.scene.fog.density = 0.0016 * Math.max(1, 1300 / g.drawDist); fogC.set(0xb9bec4); this.hour = 12.8; }
     this.sunBase = { col: new THREE.Color(T.sun[0]), I: this.sun.intensity, hemiI: this.hemi.intensity }; this.fogBase = fogC.clone();
     if (this.physSky) this.placeSun();
     if (this.grade) { const U = this.grade.uniforms; const night = name === 'night';
       U.contrast.value = night ? 0.22 : rain ? 0.16 : 0.24; U.sat.value = night ? 1.0 : rain ? 0.94 : name === 'sunset' ? 1.06 : 1.03; U.vig.value = night ? 0.18 : 0.12;
       U.grain.value = 0; // clean glass/paint and stable fine detail, especially after adaptive upscaling
       U.shadowTint.value.set(...(night ? [0.96, 1.0, 1.07] : rain ? [0.98, 1.0, 1.03] : [0.985, 1.0, 1.03])); U.hiTint.value.set(...(night ? [1.04, 1.0, 0.94] : name === 'sunset' ? [1.04, 1.0, 0.95] : [1.025, 1.0, 0.965])); }
-    this.r.toneMappingExposure = photo ? 0.85 : this.physSky ? 0.94 : rain ? 1.1 : T.exp; this.night = name === 'night';
+    this.r.toneMappingExposure = this.overcast ? 1.05 : photo ? 0.85 : this.physSky ? 0.94 : rain ? 1.1 : T.exp; this.night = name === 'night';
     if (this.bloom) { this.bloom.strength = name === 'night' ? (hi ? 0.36 : 0.5) : rain ? (hi ? 0.18 : 0.25) : (hi ? 0.12 : 0.16); this.bloom.threshold = name === 'night' ? (hi ? 0.88 : 0.82) : 0.9; this.bloom.radius = hi ? 0.42 : name === 'night' ? 0.5 : 0.55; } // retain lamp glow without washing out paint and road detail
-    this.scene.environmentIntensity = name === 'night' ? 0.6 : rain ? 0.85 : 1;
-    this.nightLights(name === 'night' || rain);
-    if (rain && g.weatherFx && !this.rain) this.makeRain(); if (this.rain) this.rain.visible = rain && g.weatherFx;
+    this.scene.environmentIntensity = this.overcast ? 1.15 : name === 'night' ? 0.6 : rain ? 0.85 : 1;
+    this.nightLights(name === 'night' || wetSky);
+    if (wetSky && g.weatherFx && !this.rain) this.makeRain(); if (this.rain) this.rain.visible = wetSky && g.weatherFx;
   }
   ensureSky() {
     if (this.sky) return; this.sky = this.newSky(); this.sky.scale.setScalar(1500); this.sky.frustumCulled = false; this.sky.renderOrder = -10; this.scene.add(this.sky);

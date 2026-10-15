@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8"><base href="../">
+<style>body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./js/lib/three.module.js"}}</script></head><body>
+<script type="module">
+// Cuzzy Racing ad studio: in-engine parody commercials + posters starring Shak (buildPerson('shak'), the real player
+// model). Used headless by tools/mapfill/render_ads.mjs (frame-by-frame, deterministic) and live by the game for nothing
+// else: the game plays the exported MP4s / posters. ?ad=0..3 &w=&h= ; window.STUDIO.frame(t) renders one frame at time t.
+import { ADS } from './js/ads_data.js';
+import { Studio } from './js/ads_studio.js';
+const q = new URLSearchParams(location.search);
+const W = +(q.get('w') || 1920), H = +(q.get('h') || 1080);
+const st = new Studio(W, H); document.body.appendChild(st.out);
+window.STUDIO = st; window.ADS = ADS;
+st.ready().then(() => { window.STUDIO_READY = true; console.log('studio ready', st.clips.join(',')); });
+if (q.has('play')) { const ad = +q.get('ad') || 0; st.ready().then(() => { st.load(ad); const t0 = performance.now(); const loop = () => { const t = ((performance.now() - t0) / 1000) % ADS[ad].dur; st.frame(t); requestAnimationFrame(loop); }; loop(); }); }
+</script></body></html>

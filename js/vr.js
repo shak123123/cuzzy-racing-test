@@ -12,13 +12,16 @@
 //    rear-view + side mirrors as small render targets on Ultra only
 // Desktop preview without a headset: ?vrsim=1 (mono view from the seat, hands posed on the wheel) for screenshots / tests.
 import * as THREE from 'three';
+import { heroTouch } from './hero.js';
+import { installPlus, autoTier } from './vr-plus.js';
+import { RealHand } from './vr-hands.js';
 const UA = navigator.userAgent, QUEST3 = /Quest 3/i.test(UA), QUEST = /OculusBrowser|Quest/i.test(UA);
 const TIERS = {
   quest: { label: 'Quest', fb: 1.0, fov: 1, hz: 72, g: { shadows: 0, reflections: 1, envDetail: 1, carDetail: 2, drawDist: 700, effects: 0, weatherFx: true }, mirrors: false },
   questHigh: { label: 'Quest High', fb: 1.15, fov: 0.7, hz: 90, g: { shadows: 1, reflections: 1, envDetail: 2, carDetail: 2, drawDist: 1100, effects: 0, weatherFx: true }, mirrors: false },
   ultra: { label: 'Ultra (PC VR)', fb: 1.4, fov: 0.3, hz: 90, g: { shadows: 2, reflections: 2, envDetail: 3, carDetail: 2, drawDist: 1600, effects: 0, weatherFx: true }, mirrors: true },
 };
-const DEF = { tier: QUEST3 ? 'questHigh' : QUEST ? 'quest' : 'ultra', range: 540, turn: 'snap', vignette: false, horizon: 'car', haptics: 1, mirrors: true, assist: false };
+const DEF = { tier: 'auto', range: 540, turn: 'snap', vignette: false, horizon: 'car', haptics: 1, mirrors: true, assist: false };
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 
@@ -38,11 +41,12 @@ function makeHand(side) {
   const th = new THREE.Group(); th.position.set(-0.044 * s, -0.004, -0.012); th.rotation.set(0, 0.75 * s, 0); g.add(th); const tch = []; let tp = th;
   for (let k = 0; k < 2; k++) { const j = new THREE.Group(); if (k) j.position.z = -0.024; tp.add(j); j.add(seg(0.024, 0.0095)); tch.push(j); tp = j; }
   g.userData = { fingers, thumb: tch, side };
-  g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.frustumCulled = false; } });
+  g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.frustumCulled = false; o.userData.glove = true; } });
+  const real = new RealHand(side); g.add(real.g); g.userData.real = real; // p55: real skin hands; the glove is the fallback while the model loads
   return g;
 }
 // curls 0..1 per finger [index, middle, ring, little], thumb 0..1
-function poseHand(h, curls, thumb) { const F = h.userData.fingers; for (let i = 0; i < 4; i++) { const c = curls[i]; F[i][0].rotation.x = -c * 1.25; F[i][1].rotation.x = -c * 1.45; F[i][2].rotation.x = -c * 1.1; }
+function poseHand(h, curls, thumb) { h.userData.curl = curls; h.userData.th = thumb; h.userData.real?.pose(curls, thumb); const F = h.userData.fingers; for (let i = 0; i < 4; i++) { const c = curls[i]; F[i][0].rotation.x = -c * 1.25; F[i][1].rotation.x = -c * 1.45; F[i][2].rotation.x = -c * 1.1; }
   const T = h.userData.thumb, s = h.userData.side === 'left' ? -1 : 1; T[0].rotation.set(-thumb * 0.5, 0, thumb * 0.6 * s); T[1].rotation.x = -thumb * 0.9; }
 
 // ---------------------------------------------------------------- canvas panels (dash HUD, menu)
@@ -53,10 +57,11 @@ export class VR {
   constructor(app) {
     this.app = app; this.active = false; this.sim = new URLSearchParams(location.search).get('vrsim') === '1';
     try { this.opt = { ...DEF, ...(JSON.parse(localStorage.getItem('cuzzy.vr') || '{}')) }; } catch (e) { this.opt = { ...DEF }; }
-    this.supported = false; this.wheelA = 0; this.grab = {}; this.hands = {}; this.src = {}; this.prevBtn = {}; this.menuOn = false;
+    this.supported = false; this.wheelA = 0; this.grab = {}; this.hands = {}; this.src = {}; this.prevBtn = {}; this.menuOn = false; this.sel = {};
     if (navigator.xr?.isSessionSupported) navigator.xr.isSessionSupported('immersive-vr').then(ok => { this.supported = ok || this.sim; this.button(); }).catch(() => { });
     if (this.sim) this.supported = true; this.button();
   }
+  tierKey() { return this.opt.tier === 'auto' || !TIERS[this.opt.tier] ? autoTier(this.ses) : this.opt.tier; }
   save() { try { localStorage.setItem('cuzzy.vr', JSON.stringify(this.opt)); } catch (e) { } }
   // DOM entry button (menu + in game)
   button() { let b = document.getElementById('vr-btn'); if (!this.supported) { if (b) b.hidden = true; return; }
@@ -66,13 +71,13 @@ export class VR {
   // ---------------------------------------------------------------- session
   async enter() {
     const A = this.app, G = A.gfx, r = G.r; if (this.active) return;
-    if (!A.session) { const car = A.carsById?.[A.store?.profile?.selected] || A.cars[0]; A.launch({ mode: 'free', carObj: car, ups: A.store?.profile?.ups?.[car.id] || {}, custom: A.store?.profile?.custom?.[car.id] || {}, time: 'day', weather: 'dry' }); }
-    const T = TIERS[this.opt.tier] || TIERS.quest; const g = A.settings.graphics; this.gSaved = { ...g }; Object.assign(g, T.g); this.ctlSaved = { steerAssist: A.settings.controls.steerAssist, smartThrottle: A.settings.controls.smartThrottle };
+    if (!A.session) { const car = A.cars.find(c => c.vr) || A.carsById?.[A.store?.profile?.selected] || A.cars[0]; /* p53: the R6 Avant is the default VR car */ A.launch({ mode: 'free', carObj: car, ups: A.store?.profile?.ups?.[car.id] || {}, custom: A.store?.profile?.custom?.[car.id] || {}, time: 'day', weather: 'dry' }); }
+    const T = TIERS[this.tierKey()] || TIERS.quest; const g = A.settings.graphics; this.gSaved = { ...g }; Object.assign(g, T.g); this.ctlSaved = { steerAssist: A.settings.controls.steerAssist, smartThrottle: A.settings.controls.smartThrottle };
     if (!this.opt.assist) { A.settings.controls.steerAssist = 0; A.settings.controls.smartThrottle = false; } // sim feel: the wheel is the steering
     try { A.applyGraphics?.(); } catch (e) { }
     if (!this.sim) {
       let ses; try { ses = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'hand-tracking', 'layers'] }); } catch (e) { A.hud?.flash?.('VR not available: ' + e.message, 2); Object.assign(g, this.gSaved); return; }
-      r.xr.enabled = true; r.xr.setReferenceSpaceType('local'); r.xr.setFramebufferScaleFactor(T.fb);
+      r.xr.enabled = true; r.xr.setReferenceSpaceType(this.opt.stance === 'standing' ? 'local-floor' : 'local'); r.xr.setFramebufferScaleFactor(T.fb);
       // MSAA on the XR layer: three reads the GL context attributes when the session starts (the page canvas has AA off)
       const gl = r.getContext(), ga = gl.getContextAttributes.bind(gl); gl.getContextAttributes = () => ({ ...ga(), antialias: true });
       try { await r.xr.setSession(ses); } finally { gl.getContextAttributes = ga; }
@@ -80,6 +85,7 @@ export class VR {
       this.ses = ses; ses.addEventListener('end', () => this.cleanup());
       for (let i = 0; i < 2; i++) { const c = r.xr.getController(i), gr = r.xr.getControllerGrip(i), hd = r.xr.getHand(i);
         c.addEventListener('connected', e => { const s = e.data.handedness || (i ? 'right' : 'left'); this.src[s] = { input: e.data, ray: c, grip: gr, hand: hd }; this.addRay(c); });
+        c.addEventListener('selectstart', () => { for (const k in this.src) if (this.src[k].ray === c) this.sel[k] = 1; });
         c.addEventListener('disconnected', e => { for (const k in this.src) if (this.src[k].ray === c) delete this.src[k]; }); }
     }
     this.build(); this.active = true; document.getElementById('vr-btn') && (document.getElementById('vr-btn').textContent = 'EXIT VR');
@@ -91,7 +97,7 @@ export class VR {
   cleanup() { const A = this.app, G = A.gfx; if (!this.active) return; this.active = false; G.r.setAnimationLoop(null); G.r.xr.enabled = false;
     if (this.rig) { G.scene.remove(this.rig); } if (this.camParent !== undefined) { (this.camParent || G.scene).add?.(G.cam); if (!this.camParent) G.scene.remove(G.cam); } G.cam.position.set(0, 2, 5);
     if (this.gSaved) Object.assign(A.settings.graphics, this.gSaved); if (this.ctlSaved) Object.assign(A.settings.controls, this.ctlSaved); try { A.applyGraphics?.(); G.resize(); } catch (e) { }
-    for (const m of this.mirrors || []) m.rt.dispose(); this.mirrors = null; this.ses = null; const b = document.getElementById('vr-btn'); if (b) b.textContent = 'ENTER VR'; }
+    try { this.plusCleanup(); } catch (e) { } for (const m of this.mirrors || []) m.rt.dispose(); this.mirrors = null; this.ses = null; const b = document.getElementById('vr-btn'); if (b) b.textContent = 'ENTER VR'; }
   // ---------------------------------------------------------------- scene objects
   build() { const G = this.app.gfx; if (this.rig) G.scene.remove(this.rig);
     this.rig = new THREE.Group(); this.rig.name = 'vrRig'; this.seat = new THREE.Group(); this.rig.add(this.seat); G.scene.add(this.rig);
@@ -104,7 +110,7 @@ export class VR {
     // comfort vignette + fade (camera-locked)
     const vg = new THREE.Mesh(new THREE.RingGeometry(0.16, 1.2, 48), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: 0, depthTest: false, toneMapped: false })); vg.position.z = -0.25; vg.renderOrder = 20; G.cam.add(vg); this.vig = vg;
     const fd = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 8), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: 0, side: THREE.BackSide, depthTest: false, toneMapped: false })); fd.renderOrder = 21; G.cam.add(fd); this.fade = fd; this.fadeT = 0;
-    this.carKey = null; this.drawMenu(); }
+    this.carKey = null; this.plusBuild(); this.drawMenu(); }
   addRay(c) { if (c.userData.ray) return; const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0x19e6c1, transparent: true, opacity: 0.8 })); l.scale.z = 2; l.visible = false; c.add(l); c.userData.ray = l; }
   // per car: wheel frame, gear lever, door handle, mirrors (car-body local)
   fitCar(sess) { const u = sess.obj.userData; const key = sess.car?.id + ':' + sess.obj.uuid; if (this.carKey === key) return; this.carKey = key; const body = u.body || sess.obj;
@@ -121,11 +127,11 @@ export class VR {
       const piv = new THREE.Group(); piv.position.copy(wc); piv.lookAt(_v.copy(wc).add(this.wAxis)); piv.add(w); body.add(piv); this.vrWheel = w; this.carObjs.push(piv); } else this.vrWheel = null;
     // gear lever (centre console) and door handle
     const lv = new THREE.Group(); lv.position.set(eye.x * 0.3, eye.y - 0.55, eye.z - 0.22); const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.011, 0.16, 8), new THREE.MeshStandardMaterial({ color: 0x222226, roughness: 0.4 })); stick.position.y = 0.08; lv.add(stick);
-    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.024, 14, 10), new THREE.MeshStandardMaterial({ color: 0xd8d8dc, metalness: 0.8, roughness: 0.25 })); knob.position.y = 0.165; lv.add(knob); body.add(lv); this.lever = lv; this.carObjs.push(lv);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.024, 14, 10), new THREE.MeshStandardMaterial({ color: 0xd8d8dc, metalness: 0.8, roughness: 0.25 })); knob.position.y = 0.165; lv.add(knob); body.add(lv); this.lever = lv; this.carObjs.push(lv); if (u.hero?.lever) { body.remove(lv); this.lever = u.hero.lever; } // p53 hero car: its own sequential lever
     this.door = new THREE.Vector3(eye.x + Math.sign(eye.x || 1) * 0.42, eye.y - 0.28, eye.z - 0.12);
     // dash panel just above the instrument binnacle
     this.dashPos = new THREE.Vector3(wc.x, wc.y + 0.2, wc.z - 0.14);
-    if (this.opt.mirrors && TIERS[this.opt.tier]?.mirrors) this.makeMirrors(body, eye, u); }
+    if (this.opt.mirrors && TIERS[this.tierKey()]?.mirrors && !u.hero) this.makeMirrors(body, eye, u); }
   makeMirrors(body, eye, u) { const W = (u.dims?.W || 1.9) / 2; this.mirrors = [];
     for (const [nm, pos, w, h, rw] of [['rear', [0, eye.y + 0.14, eye.z - 0.5], 0.26, 0.07, 384], ['L', [-W - 0.06, eye.y - 0.1, eye.z - 0.42], 0.16, 0.1, 192], ['R', [W + 0.06, eye.y - 0.1, eye.z - 0.42], 0.16, 0.1, 192]]) {
       const rt = new THREE.WebGLRenderTarget(rw, Math.round(rw * h / w), { samples: 0 }); rt.texture.colorSpace = THREE.SRGBColorSpace;
@@ -140,7 +146,7 @@ export class VR {
     if (u.body) u.body.visible = true; const ck = document.getElementById('ckov'); if (ck) ck.style.display = 'none';
     if (u.driverMesh) u.driverMesh.visible = false;
     const body = u.body || sess.obj; body.updateMatrixWorld(true);
-    if (foot) { const f = sess.foot, p = f.p; this.rig.position.set(p.x, p.y + 1.62, p.z); this.rig.quaternion.setFromAxisAngle(_v.set(0, 1, 0), this.footYaw ?? (this.footYaw = f.yaw)); if (f.char) f.char.visible = false; }
+    if (foot) { const f = sess.foot, p = f.p; this.rig.position.set(p.x, p.y + (this.opt.stance === 'standing' && !this.sim ? 0 : 1.62), p.z); this.rig.quaternion.setFromAxisAngle(_v.set(0, 1, 0), this.footYaw ?? (this.footYaw = f.yaw)); if (f.char) f.char.visible = false; }
     else { const eyeW = _v.copy(this.eye).applyMatrix4(body.matrixWorld); this.rig.position.copy(eyeW);
       body.getWorldQuaternion(_q); if (this.opt.horizon === 'level') { const e = new THREE.Euler().setFromQuaternion(_q, 'YXZ'); _q.setFromEuler(e.set(0, e.y, 0, 'YXZ')); } this.rig.quaternion.copy(_q); }
     // dash panel in body space -> world (only while driving)
@@ -148,12 +154,13 @@ export class VR {
     this.inputs(dt, sess, foot); this.handsFrame(dt, sess, foot); this.mirrorFrame();
     if ((this.dashT = (this.dashT || 0) + dt) > 0.066) { this.dashT = 0; this.drawDash(sess); }
     if (this.fadeT > 0) { this.fadeT -= dt; } this.fade.material.opacity = clamp(this.fadeT / 0.25, 0, 1);
+    this.plusUpdate(dt, sess, foot); this.sel = {};
     this.vig.material.opacity += ((this.opt.vignette ? this.vigWant || 0 : 0) * 0.85 - this.vig.material.opacity) * Math.min(1, dt * 6); }
   // controller / hand state, world (seat) positions
   pad(s) { return this.src[s]?.input?.gamepad || null; }
   btn(s, i) { const g = this.pad(s); return g?.buttons?.[i]?.pressed || false; }
-  val(s, i) { const g = this.pad(s); return g?.buttons?.[i]?.value || 0; }
-  edge(s, i) { const k = s + i, now = this.btn(s, i), was = this.prevBtn[k]; this.prevBtn[k] = now; return now && !was; }
+  val(s, i) { if (s === 'left' && i === 3 && this.opt.gearbox === 'h') { const g = this.pad(s); return g?.buttons?.[0]?.value || 0; } const g = this.pad(s); return g?.buttons?.[i]?.value || 0; }
+  edge(s, i) { const k = s + i, now = this.btn(s, i) || (i === 0 && !!this.sel?.[s]), was = this.prevBtn[k]; this.prevBtn[k] = now; return now && !was; }
   handPos(s, out) { const S = this.src[s]; if (this.sim) return out.copy(this.simHand(s)); if (!S) return null; const hd = S.input?.hand;
     if (hd && S.hand?.joints?.['middle-finger-metacarpal']) { S.hand.joints['middle-finger-metacarpal'].getWorldPosition(out); return out; } S.grip.getWorldPosition(out); return out; }
   handGrab(s) { if (this.sim) return 1; const S = this.src[s]; if (!S) return 0; if (S.input?.hand) return this.fist(s) > 0.65 ? 1 : 0; return this.val(s, 1); }
@@ -166,7 +173,7 @@ export class VR {
     if (this.menuOn) { this.menuPointer(); return; }
     if (foot) { const f = sess.foot, g = this.pad(L), gr = this.pad(R); const ax = g?.axes || [], ar = gr?.axes || [];
       const head = this.headYaw(); f.cy = head; f.joy.x = Math.abs(ax[2] || 0) > 0.12 ? ax[2] : 0; f.joy.y = Math.abs(ax[3] || 0) > 0.12 ? ax[3] : 0; f.run = this.btn(L, 3);
-      const tx = ar[2] || 0; if (this.opt.turn === 'snap') { if (Math.abs(tx) > 0.7 && !this.snapHeld) { this.snapHeld = true; this.footYaw = (this.footYaw || 0) - Math.sign(tx) * Math.PI / 6; this.fadeT = Math.max(this.fadeT, 0.12); } if (Math.abs(tx) < 0.3) this.snapHeld = false; }
+      const tx = ar[2] || 0; if (this.opt.turn === 'snap') { if (Math.abs(tx) > 0.7 && !this.snapHeld) { this.snapHeld = true; this.footYaw = (this.footYaw || 0) - Math.sign(tx) * (this.opt.snapDeg || 30) * Math.PI / 180; this.fadeT = Math.max(this.fadeT, 0.12); } if (Math.abs(tx) < 0.3) this.snapHeld = false; }
       else if (Math.abs(tx) > 0.15) this.footYaw = (this.footYaw || 0) - tx * dt * 2.2;
       this.vigWant = Math.hypot(f.joy.x, f.joy.y) > 0.2 || (this.opt.turn !== 'snap' && Math.abs(tx) > 0.15) ? 1 : 0;
       if (this.edge(R, 4)) { const was = f.active; f.action(); if (was && !f.active) { this.fadeT = 0.5; this.pulse(R, 0.5, 40); } }
@@ -179,19 +186,20 @@ export class VR {
   input(sess, dt) { if (!this.active || sess.foot?.active) return; const i = sess.inp, R = 'right', L = 'left';
     if (this.menuOn) { i.throttle = 0; i.brake = 0.3; return; }
     const thr = this.sim ? i.throttle : this.val(R, 0), brk = this.sim ? i.brake : this.val(L, 0);
-    if (!this.sim) { i.throttle = thr; i.brake = brk; if (sess.S.reverse && !i.hPattern) { i.throttle = brk; i.brake = thr; } i.handbrake = this.btn(R, 3) ? 1 : 0; }
+    const xrPads = !!(this.pad(R) || this.pad(L)); if (!this.sim && xrPads) { const hb2 = this.opt.gearbox === 'h' && !this.app.settings.controls.auto; i.throttle = thr; i.brake = hb2 ? Math.max(0, this.pad(R)?.axes?.[3] || 0) : brk; if (sess.S.reverse && !i.hPattern) { i.throttle = brk; i.brake = thr; } i.handbrake = this.btn(R, 3) ? 1 : 0; }
     const half = this.opt.range * Math.PI / 360; const anyGrab = this.grab.left || this.grab.right;
-    if (this.sim) { } else if (anyGrab) i.steer = clamp(this.wheelA / half, -1, 1);
+    if (this.sim || !xrPads) { } else if (anyGrab) i.steer = clamp(this.wheelA / half, -1, 1);
     else { const ax = this.pad(L)?.axes?.[2] || 0; if (Math.abs(ax) > 0.08) { i.steer = -ax; this.wheelA = -ax * half; } else i.steer = clamp(this.wheelA / half, -1, 1); }
-    if (this.sim) this.wheelA += (i.steer * half - this.wheelA) * Math.min(1, dt * 8); // keyboard drives the preview wheel
+    if (this.sim || !xrPads) this.wheelA += (i.steer * half - this.wheelA) * Math.min(1, dt * 8); // keyboard drives the preview wheel
   }
   // wheel geometry in world space
   wheelFrame(sess) { const body = sess.obj.userData.body || sess.obj; const C = _v.copy(this.wc).applyMatrix4(body.matrixWorld).clone(); body.getWorldQuaternion(_q); const ax = this.wAxis.clone().applyQuaternion(_q);
     const up = new THREE.Vector3(0, Math.cos(0.38), -Math.sin(0.38)).applyQuaternion(_q), right = new THREE.Vector3().crossVectors(up, ax).normalize(); return { C, ax, up, right }; }
   angOn(F, p) { const d = _v2.copy(p).sub(F.C); return Math.atan2(d.dot(F.right), d.dot(F.up)); } // 0 = top of the rim, + = clockwise from the driver's view
-  handsFrame(dt, sess, foot) { const F = foot ? null : this.wheelFrame(sess); const S = sess.S; let torque = 0; const half = this.opt.range * Math.PI / 360;
-    for (const s of ['left', 'right']) { const h = this.hands[s], src = this.src[s]; const hasHand = !!src?.input?.hand; h.visible = this.sim || (!!src && (!foot || !hasHand));
+  handsFrame(dt, sess, foot) { if (foot) { this.grab.left = this.grab.right = null; this.lvGrab = null; } /* the wheel stays in the car */ const F = foot ? null : this.wheelFrame(sess); const S = sess.S; let torque = 0; const half = this.opt.range * Math.PI / 360;
+    for (const s of ['left', 'right']) { const h = this.hands[s], src = this.src[s]; const hasHand = !!src?.input?.hand; h.visible = this.sim || !!src;
       if (!h.visible) continue; const p = this.handPos(s, new THREE.Vector3()); if (!p) { h.visible = false; continue; }
+      if (!foot && !this.sim) { const hn = heroTouch(sess, p, s); if (hn) this.pulse(s, 0.6, 22); } // p53: press hero-car buttons / paddles with a fingertip or controller
       const grabV = this.handGrab(s), G = this.grab[s];
       if (!foot && F) { const d = _v2.copy(p).sub(F.C), along = d.dot(F.ax), rad = Math.hypot(d.dot(F.right), d.dot(F.up));
         if (!G && grabV > 0.6 && Math.abs(along) < 0.09 && Math.abs(rad - this.wR) < 0.09) { this.grab[s] = { a0: this.angOn(F, p), w0: this.wheelA, last: this.angOn(F, p), acc: 0 }; this.pulse(s, 0.35, 18); }
@@ -209,7 +217,9 @@ export class VR {
         const radial = F.up.clone().multiplyScalar(Math.cos(ang)).addScaledVector(F.right, Math.sin(ang)); const look = new THREE.Matrix4().lookAt(new THREE.Vector3(), F.ax.clone().negate(), radial); const wq = new THREE.Quaternion().setFromRotationMatrix(look);
         this.seat.getWorldQuaternion(_q); h.quaternion.copy(_q.invert().multiply(wq)); h.rotateZ(s === 'left' ? -1.2 : 1.2); poseHand(h, [0.82, 0.86, 0.88, 0.9], 0.75); }
       else { const sp = this.seat.worldToLocal(p.clone()); h.position.copy(sp); const ob = this.sim ? null : (src?.grip || null); if (ob) { ob.getWorldQuaternion(_q); const sq = this.seat.getWorldQuaternion(new THREE.Quaternion()).invert(); h.quaternion.copy(sq.multiply(_q)); h.rotateX(-0.5); }
-        const gr = this.sim ? 0 : hasHand ? this.fist(s) : this.val(s, 1), tr = this.sim ? 0 : hasHand ? gr : this.val(s, 0); poseHand(h, [tr * 0.9, gr, gr, gr], Math.max(gr, this.btn(s, 3) || this.btn(s, 4) || this.btn(s, 5) ? 0.6 : 0) * 0.8); } }
+        const gr = this.sim ? 0 : hasHand ? this.fist(s) : this.val(s, 1), tr = this.sim ? 0 : hasHand ? gr : this.val(s, 0); const pd = this.pad(s), tch = !!(pd?.buttons?.[3]?.touched || pd?.buttons?.[4]?.touched || pd?.buttons?.[5]?.touched || pd?.buttons?.[0]?.touched);
+        if (this.sim && this.simPose) { const P = { point: [[0, 1, 1, 1], 0.7], pinch: [[0.55, 0.3, 0.2, 0.15], 0.75], thumbs: [[1, 1, 1, 1], 0], fist: [[1, 1, 1, 1], 0.8], open: [[0, 0, 0, 0], 0] }[this.simPose]; poseHand(h, P[0], P[1]); }
+        else poseHand(h, [tr * (tch && tr < 0.6 ? 0.55 : 0.95), gr, gr, gr], tch ? Math.max(0.55, gr * 0.8) : gr > 0.6 && tr > 0.6 ? 0 : gr * 0.5); } }
     if (foot || !F) return;
     // wheel angle: average of the grabbing hands' travel round the rim; self-centring when released
     const gs = ['left', 'right'].filter(s => this.grab[s]);
@@ -224,7 +234,7 @@ export class VR {
   toBody(sess, p) { const body = sess.obj.userData.body || sess.obj; return body.worldToLocal(p.clone()); }
   pulse(s, k, ms) { if (!this.opt.haptics) return; const a = this.pad(s)?.hapticActuators?.[0] || this.src[s]?.input?.gamepad?.vibrationActuator; try { a?.pulse ? a.pulse(clamp(k * this.opt.haptics, 0, 1), ms) : a?.playEffect?.('dual-rumble', { duration: ms, strongMagnitude: k }); } catch (e) { } }
   // desktop preview hands: on the rim at ten-to-two
-  simHand(s) { const sess = this.app.session; const F = this.wheelFrame(sess); const a = (s === 'left' ? -1.05 : 1.05) + this.wheelA; return F.C.clone().addScaledVector(F.up, Math.cos(a) * this.wR).addScaledVector(F.right, Math.sin(a) * this.wR); }
+  simHand(s) { const sess = this.app.session; if (sess.foot?.active) { const c = this.app.gfx.cam.getWorldPosition(new THREE.Vector3()), y = this.footYaw ?? sess.foot.yaw; return new THREE.Vector3(s === 'left' ? -0.24 : 0.24, -0.82, 0.02).applyAxisAngle(new THREE.Vector3(0, 1, 0), y).add(c); } /* on foot: hands hang at the sides */ const F = this.wheelFrame(sess); const a = (s === 'left' ? -1.05 : 1.05) + this.wheelA; return F.C.clone().addScaledVector(F.up, Math.cos(a) * this.wR).addScaledVector(F.right, Math.sin(a) * this.wR); }
   recentre(first) { if (this.sim || !this.app.gfx.r.xr.isPresenting) { this.seat?.position.set(0, 0, 0); return; } const xc = this.app.gfx.r.xr.getCamera(); const run = () => { this.seat.updateMatrixWorld(true);
       const local = this.seat.worldToLocal(xc.getWorldPosition(new THREE.Vector3())).add(this.seat.position.clone().negate()); // head relative to the seat origin, minus current offset
       const hl = xc.getWorldDirection(new THREE.Vector3()); this.rig.worldToLocal(hl.add(this.rig.getWorldPosition(new THREE.Vector3()))); const yaw = Math.atan2(-hl.x, -hl.z);
@@ -234,7 +244,7 @@ export class VR {
   mirrorFrame() { if (!this.mirrors?.length) return; const G = this.app.gfx, r = G.r; const m = this.mirrors[this.mirN++ % this.mirrors.length]; const xr = r.xr.enabled, rtOld = r.getRenderTarget();
     r.xr.enabled = false; r.setRenderTarget(m.rt); const sh = r.shadowMap.autoUpdate; r.shadowMap.autoUpdate = false; m.q.visible = false; r.render(G.scene, m.cam); m.q.visible = true; r.shadowMap.autoUpdate = sh; r.setRenderTarget(rtOld); r.xr.enabled = xr; }
   // ---------------------------------------------------------------- adaptive governor: hold the headset refresh rate
-  govern(dt) { const T = TIERS[this.opt.tier] || TIERS.quest, tgt = 1 / T.hz; this.gw = (this.gw || 0) * 0.95 + dt * 0.05; this.gT = (this.gT || 0) + dt; if (this.gT < 2) return; this.gT = 0;
+  govern(dt) { const T = TIERS[this.tierKey()] || TIERS.quest, tgt = 1 / T.hz; this.gw = (this.gw || 0) * 0.95 + dt * 0.05; this.gT = (this.gT || 0) + dt; if (this.gT < 2) return; this.gT = 0;
     const g = this.app.settings.graphics, r = this.app.gfx.r; if (this.gw > tgt * 1.12) { this.lvl = (this.lvl || 0) + 1;
       if (this.lvl === 1) r.xr.setFoveation(1); else if (this.lvl === 2 && g.shadows) { g.shadows = 0; this.app.applyGraphics?.(); } else if (this.lvl === 3 && g.drawDist > 600) { g.drawDist = Math.max(500, g.drawDist - 300); this.app.applyGraphics?.(); } else if (this.lvl === 4 && this.mirrors) { this.mirrors.forEach(m => m.q.visible = false); this.mirrors = []; }
       console.log('vr governor', this.lvl, (1 / this.gw).toFixed(0) + ' fps'); } }
@@ -250,19 +260,21 @@ export class VR {
   menuItems() { const o = this.opt; return [
     ['Resume', () => { this.menuOn = false; this.menu.m.visible = false; }],
     ['Recentre seat', () => this.recentre()],
+    ...(this.app.session?.car?.hero ? [] : [['Drive the CUZZY R6 Avant (VR pick)', () => this.heroSwap()]]),
     ['Wheel rotation: ' + o.range + '°', () => { o.range = o.range === 360 ? 540 : o.range === 540 ? 900 : 360; }],
     ['Horizon: ' + (o.horizon === 'car' ? 'locked to car' : 'level'), () => { o.horizon = o.horizon === 'car' ? 'level' : 'car'; }],
     ['Turning on foot: ' + (o.turn === 'snap' ? 'snap 30°' : 'smooth'), () => { o.turn = o.turn === 'snap' ? 'smooth' : 'snap'; }],
     ['Comfort vignette: ' + (o.vignette ? 'on' : 'off'), () => { o.vignette = !o.vignette; }],
     ['Haptics: ' + (o.haptics ? Math.round(o.haptics * 100) + '%' : 'off'), () => { o.haptics = o.haptics >= 1 ? 0 : o.haptics ? 1 : 0.5; }],
     ['Driving aids: ' + (o.assist ? 'on' : 'off (sim)'), () => { o.assist = !o.assist; this.app.settings.controls.steerAssist = o.assist ? this.ctlSaved?.steerAssist ?? 0.6 : 0; this.app.settings.controls.smartThrottle = o.assist; }],
-    ['Graphics: ' + TIERS[o.tier].label + ' (next VR start)', () => { o.tier = o.tier === 'quest' ? 'questHigh' : o.tier === 'questHigh' ? 'ultra' : 'quest'; }],
+    ['Graphics: ' + (o.tier === 'auto' ? 'Auto (' + TIERS[this.tierKey()].label + ')' : TIERS[o.tier].label) + ' (next VR start)', () => { o.tier = { auto: 'quest', quest: 'questHigh', questHigh: 'ultra', ultra: 'auto' }[o.tier] || 'auto'; }],
     ['Mirrors (Ultra): ' + (o.mirrors ? 'on' : 'off'), () => { o.mirrors = !o.mirrors; this.carKey = null; }],
+    ...this.plusMenu(),
     ['Exit VR', () => this.exit()]]; }
   drawMenu() { if (!this.menu) return; const { g, c, t } = this.menu; const it = this.menuItems(); g.clearRect(0, 0, c.width, c.height);
     g.fillStyle = 'rgba(10,12,16,.92)'; g.beginPath(); g.roundRect(0, 0, c.width, c.height, 36); g.fill(); g.fillStyle = '#19e6c1'; g.font = '900 52px system-ui'; g.textAlign = 'left'; g.fillText('CUZZY RACING · VR', 48, 76);
-    this.menuRects = []; it.forEach(([label], i) => { const x = 48 + (i % 2) * 476, y = 112 + Math.floor(i / 2) * 106, w = 452, h = 88; this.menuRects.push([x, y, w, h]);
-      g.fillStyle = this.menuHover === i ? '#19e6c1' : 'rgba(255,255,255,.08)'; g.beginPath(); g.roundRect(x, y, w, h, 18); g.fill(); g.fillStyle = this.menuHover === i ? '#000' : '#fff'; g.font = '700 30px system-ui'; g.fillText(label, x + 22, y + 56); });
+    this.menuRects = []; it.forEach(([label], i) => { const rows = Math.ceil(it.length / 2), rh = Math.min(106, (c.height - 124) / rows), x = 48 + (i % 2) * 476, y = 112 + Math.floor(i / 2) * rh, w = 452, h = rh - 14; this.menuRects.push([x, y, w, h]);
+      g.fillStyle = this.menuHover === i ? '#19e6c1' : 'rgba(255,255,255,.08)'; g.beginPath(); g.roundRect(x, y, w, h, 18); g.fill(); g.fillStyle = this.menuHover === i ? '#000' : '#fff'; g.font = '700 ' + Math.round(Math.min(30, h * 0.36)) + 'px system-ui'; g.fillText(label, x + 22, y + h * 0.62); });
     t.needsUpdate = true; }
   menuPointer() { const rc = new THREE.Raycaster(); let hov = -1, who = null;
     for (const s of ['right', 'left']) { const ray = this.src[s]?.ray; if (!ray) continue; ray.updateMatrixWorld(); rc.ray.origin.setFromMatrixPosition(ray.matrixWorld); rc.ray.direction.set(0, 0, -1).transformDirection(ray.matrixWorld);
@@ -270,5 +282,8 @@ export class VR {
     if (hov !== this.menuHover) { this.menuHover = hov; this.drawMenu(); if (hov >= 0) this.pulse(who, 0.15, 8); }
     for (const s of ['right', 'left']) if (this.edge(s, 0) && hov >= 0 && s === who) { this.menuItems()[hov][1](); this.save(); this.pulse(s, 0.5, 20); this.drawMenu(); } }
   // test / preview hook
+  heroSwap() { const A = this.app, s = A.session, car = A.cars.find(c => c.vr); if (!s || !car) return; const o = { ...s.o, carObj: car }; this.menuOn = false; this.menu.m.visible = false; A.endSession(); A.launch(o); }
   async preview() { this.sim = true; await this.enter(); }
 }
+
+installPlus(VR);

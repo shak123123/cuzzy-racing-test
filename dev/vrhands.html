@@ -1,0 +1,12 @@
+<!doctype html><html><body style="margin:0"><script type="importmap">{"imports":{"three":"../js/lib/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three'; import { RealHand } from '../js/vr-hands.js';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(900, 450); document.body.appendChild(r.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0x30343a); sc.add(new THREE.HemisphereLight(0xffffff, 0x404040, 2)); const dl = new THREE.DirectionalLight(0xffffff, 2); dl.position.set(1, 2, 1); sc.add(dl);
+const cam = new THREE.PerspectiveCamera(35, 2, 0.01, 10); cam.position.set(0.0, 0.05, 0.55); cam.lookAt(0, 0, 0);
+const poses = [[[0,0,0,0],0],[[1,1,1,1],0.8],[[0,1,1,1],0.7],[[0.55,0.3,0.2,0.15],0.75],[[1,1,1,1],0]]; const H = [];
+// glove frame: fingers -Z, palm -Y. Show side view: rotate group so -Z points to +X on screen
+poses.forEach((p, i) => { const h = new RealHand('right'); h.g.position.set(-0.36 + i * 0.18, 0, 0); h.g.rotation.y = Math.PI / 2; sc.add(h.g); H.push([h, p]); });
+// a wheel rim segment for the wrapped pose reference
+(function loop() { for (const [h, p] of H) { h.pose(p[0], p[1]); if (window.__dbg === 1 && h.mesh) { h.mesh.material = new THREE.MeshBasicMaterial({ color: 0xff0000 }); } } r.render(sc, cam); window.__ok = H.every(([h]) => h.ok); if (window.__ok && !window.__p) { window.__p = 1; const h0 = H[0][0]; h0.g.updateWorldMatrix(true, true); const bb = new THREE.Box3().setFromObject(h0.g, true); console.log('bb', JSON.stringify(bb), JSON.stringify(h0.B.wrist.getWorldPosition(new THREE.Vector3())), JSON.stringify(h0.root.position), JSON.stringify(h0.rest.wrist), JSON.stringify(h0.B['index-finger-tip'].position), JSON.stringify(h0.root.quaternion), JSON.stringify(h0.root.children.map(c=>c.name+':'+c.scale.x.toFixed(3)))); } requestAnimationFrame(loop); })();
+</script></body></html>

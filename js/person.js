@@ -21,7 +21,7 @@ const LOOKS = [ // generic people: [skin, hair, top, legs, shoe, jacket?]
   [0x5c3a26, 0x0d0b09, 0xe8e8e8, 0x2b2b30, 0x111111, 0x3a2f55], [0xb07d5e, 0x2a1d14, 0xd9a520, 0x1f2a44, 0xffffff, null], [0x9a6646, 0x120e0b, 0x111111, 0x111111, 0xb02020, 0x7a1d2a]];
 export function buildPerson(look = 'shak') {
   const shak = look === 'shak', L = shak ? { skin: 0xa0694a, hair: 0x14100c, top: 0xa8744e, legs: 0x141519, shoe: 0xf3f3ef, jacket: 0xcdbf9f }
-    : (([skin, hair, top, legs, shoe, jacket]) => ({ skin, hair, top, legs, shoe, jacket }))(LOOKS[Math.abs(look | 0) % LOOKS.length]);
+    : typeof look === 'object' && look ? look /* p55 named side characters: { skin, hair, top, legs, shoe, jacket } */ : (([skin, hair, top, legs, shoe, jacket]) => ({ skin, hair, top, legs, shoe, jacket }))(LOOKS[Math.abs(look | 0) % LOOKS.length]);
   const g = new THREE.Group(), P = { g }; g.userData.person = P;
   const skin = M(L.skin, 0.7), jac = L.jacket != null ? M(L.jacket, 0.85) : null;
   const leg = s => { const p = new THREE.Group(); p.position.set(s * 0.095, 0.9, 0);

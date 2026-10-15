@@ -95,6 +95,7 @@ export class AudioSys {
     hurac: { pipe: 1.35, bright: 0.8, rough: 0.1, intake: 0.65, airbox: 185, runner: 800, pops: 1.2, exhaust: 0.5, gain: 0.95, level: 3.2 },
     avent: { pipe: 1.3, bright: 0.78, rough: 0.04, intake: 0.7, airbox: 170, runner: 820, pops: 1.1, gain: 0.95, level: 0.5 },
     f458: { pipe: 1.1, bright: 0.92, rough: 0.05, intake: 0.8, airbox: 210, runner: 900, pops: 0.8, gain: 0.9, level: 2.7 },
+    r6a: { pipe: 2.0, bright: 0.5, rough: 0.42, intake: 0.5, airbox: 125, runner: 520, turbo: 2, bov: 0.45, pops: 1.25, exhaust: 0.4, gain: 1.05, level: -1 }, // p53 4.0 twin-turbo cross-plane V8 burble
     gti8: { pipe: 1.6, bright: 0.45, rough: 0.07, intake: 0.45, airbox: 150, runner: 600, turbo: 1, bov: 0.55, pops: 1.0, gain: 1.15, level: -3.2 },
   };
   voiceFor(car) {

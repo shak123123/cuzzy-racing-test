@@ -46,11 +46,20 @@ export class Venues {
       const cx = p.reduce((a, q) => a + q[0], 0) / p.length, cz = p.reduce((a, q) => a + q[1], 0) / p.length; this.add({ id: k, name: nm, kind: 'mosque', col: '#3fd38a' }, cx, cz, p); }
   }
   // the door sits on the pavement facing the nearest road (mosques: on the building wall nearest the road)
+  // p54: a venue without its own footprint takes the nearest real building (brum.json footprint within 45 m of the spot)
+  footprintNear(x, z) { let best = null, bd = 45; for (const b of this.s.app.data.buildings || []) { const q = b.p; let cx = 0, cz = 0; for (let i = 0; i < q.length; i += 2) { cx += q[i]; cz += q[i + 1]; } cx /= q.length / 2 * 10; cz /= q.length / 2 * 10;
+      if (Math.abs(cx - x) > 80 || Math.abs(cz - z) > 80) continue; let d = 1e9; for (let i = 0; i < q.length; i += 2) d = Math.min(d, Math.hypot(q[i] / 10 - x, q[i + 1] / 10 - z)); d = Math.min(d, Math.hypot(cx - x, cz - z));
+      if (d < bd) { bd = d; best = []; for (let i = 0; i < q.length; i += 2) best.push([q[i] / 10, q[i + 1] / 10]); } } return best; }
   add(v, x, z, poly) {
+    if (!poly) poly = this.footprintNear(x, z); v.fixed = !!poly;
     let r = this.w.nearestRoad(x, z); for (let d = 25; !r && d <= 200; d += 25) for (const [ox, oz] of [[d, 0], [-d, 0], [0, d], [0, -d], [d, d], [-d, -d], [d, -d], [-d, d]]) { const q = this.w.nearestRoad(x + ox, z + oz); if (q) { r = q; x = q.px + (x - q.px) * 0.15; z = q.pz + (z - q.pz) * 0.15; break; } } if (!r) return; /* nearest street, searching wider for set-back buildings */ let dx, dz, yaw;
-    if (poly) { let best = null, bd = 1e9; for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; for (const t of [0.25, 0.5, 0.75]) { const px = a[0] + (b[0] - a[0]) * t, pz = a[1] + (b[1] - a[1]) * t, rr = this.w.nearestRoad(px, pz); if (rr && rr.d < bd) { bd = rr.d; best = [px, pz, rr]; } } }
-      const [px, pz, rr] = best; const ox = rr.px - px, oz = rr.pz - pz, l = Math.hypot(ox, oz) || 1; dx = px + ox / l * 1.2; dz = pz + oz / l * 1.2; yaw = Math.atan2(-ox, -oz) + Math.PI; }
-    else { const side = Math.sign((x - r.px) * r.nx + (z - r.pz) * r.nz) || 1, off = r.hw + 4.2; dx = r.px + r.nx * side * off; dz = r.pz + r.nz * side * off; yaw = Math.atan2(r.nx * side, r.nz * side); } // door faces the road; player enters walking away from it
+    let best = null; if (poly) { let bd = 1e9; for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 3) continue; for (const t of [0.2, 0.35, 0.5, 0.65, 0.8]) { const px = a[0] + (b[0] - a[0]) * t, pz = a[1] + (b[1] - a[1]) * t, rr = this.w.nearestRoad(px, pz); if (rr && rr.d < bd && rr.d > rr.hw + 2.2 && !(() => { const ox = rr.px - px, oz = rr.pz - pz, l = Math.hypot(ox, oz) || 1; return this.w.collide?.(px + ox / l * 1.5, pz + oz / l * 1.5, 0.32, rr.h ?? 0); })()) { bd = rr.d; best = [px, pz, rr]; } } }
+      if (!best) { poly = null; } }
+    if (poly) { const [px, pz, rr] = best; v.poly = poly; const ox = rr.px - px, oz = rr.pz - pz, l = Math.hypot(ox, oz) || 1; dx = px + ox / l * 0.62; dz = pz + oz / l * 0.62; /* p54: frame flush on the facade */ yaw = Math.atan2(-ox, -oz) + Math.PI; }
+    else { const side = Math.sign((x - r.px) * r.nx + (z - r.pz) * r.nz) || 1, off = r.hw + 2.9; dx = r.px + r.nx * side * off; dz = r.pz + r.nz * side * off;
+      const C = (ax, az) => this.w.collide?.(ax, az, 0.32, r.h ?? 0) || this.w.collide?.(ax - r.nx * side * 0.9, az - r.nz * side * 0.9, 0.32, r.h ?? 0);
+      if (C(dx, dz)) for (const t of [6, -6, 12, -12, 20, -20, 30, -30, 45, -45]) { const q = this.w.nearestRoad(r.px + r.dx * t, r.pz + r.dz * t); if (!q) continue; const ex = q.px + q.nx * side * (q.hw + 2.6), ez = q.pz + q.nz * side * (q.hw + 2.6); if (!C(ex, ez)) { dx = ex; dz = ez; r = q; break; } } /* p54: slide along the street to a clear stretch of pavement */
+      yaw = Math.atan2(-r.nx * side, -r.nz * side); /* p54: back of the pavement, door facing the road */ } // door faces the road; player enters walking away from it
     const h = this.w.groundAt(dx, dz, r.h ?? 0).h ?? 0; Object.assign(v, { x: dx, z: dz, y: h, yaw }); this.list.push(v);
     const G = new THREE.Group(); G.position.set(dx, h, dz); G.rotation.y = yaw; this.group.add(G); v.g = G; // local -Z = into the building
     const frame = new THREE.Mesh(new THREE.BoxGeometry(1.9, 2.7, 0.3), M(0x15161a, 0.6)); frame.position.set(0, 1.35, -0.45); G.add(frame);

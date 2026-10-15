@@ -9,7 +9,7 @@ export class SettingsUI {
   constructor(app) { this.app = app; this.tab = 'sound'; }
   get s() { return this.app.settings; }
   open() {
-    const tabs = [['sound', 'Sound'], ['voice', 'Voice chat'], ['graphics', 'Graphics'], ['controls', 'Controls'], ['game', 'Game & profile']];
+    const tabs = [['sound', 'Sound'], ['voice', 'Voice chat'], ['graphics', 'Graphics'], ['world', 'World'], ['controls', 'Controls'], ['game', 'Game & profile']];
     $('#set-tabs').innerHTML = tabs.map(([k, t]) => `<button class="tab ${k === this.tab ? 'on' : ''}" data-t="${k}">${t}</button>`).join('');
     for (const b of document.querySelectorAll('#set-tabs .tab')) b.onclick = () => { this.tab = b.dataset.t; this.app.audio.click(); this.open(); };
     $('#set-defaults').onclick = () => this.app.confirm('Restore defaults', `Reset all ${this.tab === 'game' ? 'game' : this.tab} settings to their defaults?`, 'Restore', () => { const d = defaults(); this.s[this.tab] = d[this.tab]; this.changed(this.tab); this.open(); });
@@ -123,7 +123,8 @@ export class SettingsUI {
       ${this.slider('controls', 'padCurve', 'Controller steering precision', 'Higher = finer control near the centre of the stick', 1, 3, 0.1)}
       ${this.slider('controls', 'rumble', 'Controller vibration', 'Rumble for engine, road, crashes, wheelspin and gear changes (0 = off)', 0, 1, 0.05)}
       ${this.slider('controls', 'steerAssist', 'Steering assist', 'Reduces lock at speed to stop spins', 0, 1, 0.05)}
-      ${this.toggle('controls', 'auto', 'Automatic gears', 'Off: shift with + / − (E / Q, bumpers)')}
+      ${this.toggle('controls', 'auto', 'Automatic gears', 'Off: Manual — shift with paddles / lever, + / − (E / Q, bumpers). In the R6: A/M key or the P-R-N-D-M selector')}
+      ${this.toggle('controls', 'clutch', 'Manual clutch', 'Manual mode only: hold Z / the VR left grip / the CLUTCH pad to dip the clutch')}
       ${this.toggle('controls', 'abs', 'ABS', 'Prevents wheel lock under braking')}
       ${this.toggle('controls', 'tc', 'Traction control')}
       ${this.toggle('controls', 'smartThrottle', 'Smart throttle', 'Touch / keys: feeds power in and stops wheelspin and power slides')}
@@ -142,6 +143,15 @@ export class SettingsUI {
     this.bind((g, k) => { if (k === 'steer') this.open(); });
     const tp = $('#tilt-perm'); if (tp) tp.onclick = async () => { try { const r = await DeviceOrientationEvent.requestPermission?.(); this.app.toast(r === 'granted' || r === undefined ? 'Motion sensors enabled' : 'Motion permission denied'); } catch (e) { this.app.toast('Motion sensors are not available'); } };
   }
+  // p55 World: weather / time of day (free roam, open world, meets) and rain effects quality. Big chips for phones.
+  world() { const w = this.s.world || (this.s.world = { weather: 'auto', time: 'auto', hour: 12, rainFx: 'auto' });
+    $('#set-body').innerHTML = `<div class="set-grid set-world">
+      ${this.select('world', 'weather', 'Weather', 'Auto follows the natural cycle; pick one to keep it', [['auto', 'Auto'], ['clear', 'Clear'], ['cloudy', 'Cloudy'], ['drizzle', 'Drizzle'], ['rain', 'Rain'], ['storm', 'Storm'], ['fog', 'Fog']])}
+      ${this.select('world', 'time', 'Time of day', 'Auto runs a 12-minute day; presets pin the clock', [['auto', 'Auto'], ['dawn', 'Dawn'], ['day', 'Day'], ['dusk', 'Dusk'], ['night', 'Night'], ['manual', 'Slider']])}
+      ${this.slider('world', 'hour', 'Clock (Slider mode)', '', 0, 23.75, 0.25, v => String(Math.floor(v)).padStart(2, '0') + ':' + String(Math.round(v % 1 * 60)).padStart(2, '0'))}
+      ${this.select('world', 'rainFx', 'Rain effects', 'Auto matches the graphics tier', [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']])}
+      </div><style>.set-world .chip{min-height:46px;min-width:76px;font-size:15px}</style>`;
+    this.bind(); }
   game() {
     const p = this.app.store.profile;
     $('#set-body').innerHTML = `<div class="set-grid">

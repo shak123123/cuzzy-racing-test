@@ -97,6 +97,7 @@ export function deriveParams(car, up = {}, calib = {}) {
     const g = [];
     for (let i = 0; i < n; i++) { const t = n === 1 ? 1 : Math.pow(i / (n - 1), 0.85); g.push(firstRatio * Math.pow(topRatio / firstRatio, t)); }
     P.final = 1; P.gears = g;
+    if (car.ratios?.length === n) { P.final = car.final || 1; P.gears = car.ratios.slice(); } // p53: real gearbox ratios (hero car)
   }
   P.gearCount = P.gears.length;
   // shift timing: torque-interruption time (s) and launch-clutch engagement time (s)

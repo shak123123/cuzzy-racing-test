@@ -11,7 +11,7 @@ export function cityTex(q, name, { srgb = true, normal = false } = {}) {
   const size = normal ? (q.env >= 3 ? '2k' : q.env >= 1 ? '1k' : '512') : ['512', '1k', '2k', '2k'][q.env] || '1k';
   const key = name + (normal ? '_n_' : '_') + size; if (texCache[key]) return texCache[key];
   const t = TL.load(new URL(`../img/city/${key}.jpg`, import.meta.url).href);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = q.aniso || 4; if (srgb && !normal) t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = q.aniso || 4; if (srgb && !normal) t.colorSpace = THREE.SRGBColorSpace; t.userData.set = name; // look.js finds the PBR set by this
   return (texCache[key] = t);
 }
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
@@ -93,17 +93,17 @@ function drawTile(style, rnd, R) {
 // facade kinds: wall texture, window style, wall tint, physical size of the wall texture (m, w x h), rooms per tile (x) for
 // the interior mapping (one room behind each bay; 3 storeys per tile)
 export const FACADES = [
-  { k: 'victorian', wall: 'brick_red', style: 'victorian', tint: 0xffffff, size: [3.4, 2.25], rooms: 4 },
-  { k: 'warehouse', wall: 'brick_dark', style: 'warehouse', tint: 0xffffff, size: [3.4, 2.25], rooms: 5 },
-  { k: 'office', wall: 'brick_buff', style: 'office', tint: 0xffffff, size: [3.4, 2.2], rooms: 6 },
+  { k: 'victorian', wall: 'brick_red', style: 'victorian', tint: 0xffffff, size: [1.4, 1.4], rooms: 4 },
+  { k: 'warehouse', wall: 'brick_dark', style: 'warehouse', tint: 0xffffff, size: [1.6, 1.6], rooms: 5 },
+  { k: 'office', wall: 'brick_buff', style: 'office', tint: 0xffffff, size: [1.6, 1.6], rooms: 6 },
   { k: 'civic', wall: 'stone', style: 'civic', tint: 0xf4efe6, size: [4.4, 2.8], rooms: 3 },
   { k: 'glass', wall: 'concrete', style: 'curtain', tint: 0xffffff, size: [4, 4], glass: true, rooms: 4 },
   { k: 'glass2', wall: 'concrete', style: 'curtain2', tint: 0xffffff, size: [4, 4], glass: true, rooms: 4 },
   { k: 'ribbon', wall: 'concrete', style: 'ribbon', tint: 0xe8e4dc, size: [4.2, 4.2], rooms: 4 },
-  { k: 'georgian', wall: 'render', style: 'georgian', tint: 0xf3eadb, size: [3.5, 3.5], rooms: 4 },
-  { k: 'flats', wall: 'brick_red', style: 'flats', tint: 0xd9c2b4, size: [3.4, 2.25], rooms: 4 },
+  { k: 'georgian', wall: 'render', style: 'georgian', tint: 0xf3eadb, size: [2, 2], rooms: 4 },
+  { k: 'flats', wall: 'brick_red', style: 'flats', tint: 0xd9c2b4, size: [1.4, 1.4], rooms: 4 },
   // round 5 (Medium+ only): sooty Flemish-bond Victorian terrace brick, 1960s exposed-aggregate precast panel block
-  { k: 'victorian2', wall: 'brick_victorian', style: 'victorian', tint: 0xffffff, size: [1.5, 1.45], rooms: 4, min: 1 },
+  { k: 'victorian2', wall: 'brick_victorian', style: 'victorian', tint: 0xffffff, size: [1.4, 1.4], rooms: 4, min: 1 },
   { k: 'panel60s', wall: 'concrete_panel', style: 'ribbon', tint: 0xf2eee6, size: [4.8, 4.8], rooms: 4, min: 1 },
 ];
 // per-building data for the facade shader: bInfo = (roof height, facade base height, random seed 0..1)
@@ -144,6 +144,13 @@ export function facadeMaterials(q, onNight) {
           vec3 wl = texture2D(wallMap, vMapUv * wallScale).rgb * wallTint;
           float nz = sin(vMapUv.x * 1.9 + sin(vMapUv.y * 1.3) * 2.0) * sin(vMapUv.y * 1.1 + vMapUv.x * 0.6); wl *= 0.9 + 0.12 * nz; // large-scale weathering: breaks up tiling
           glassK = smoothstep(0.7, 0.95, fMask.r); roomE = vec3(0.0);
+          #ifdef FAC_GRIME
+            { float st = 0.0; for (int i = 1; i <= 5; i++) { float fi = float(i); st += texture2D(maskMap, vMapUv + vec2(0.0, 0.011 * fi)).b * (1.0 - fi * 0.17); } // run-off below sills / lintels
+              wl *= 1.0 - 0.32 * clamp(st, 0.0, 1.0) * (1.0 - fMask.b); }
+          #endif
+          #ifdef FAC_HI
+            { float rv = smoothstep(0.7, 0.95, texture2D(maskMap, vMapUv + vec2(-0.005, 0.008)).r); ov.rgb *= 1.0 - 0.55 * glassK * (1.0 - rv); } // recessed window: reveal shadow inside the frame
+          #endif
           #ifdef FAC_GRIME
             float sd = vBI.z; wl *= mix(vec3(1.0), vec3(0.86 + 0.26 * fract(sd * 7.13), 0.86 + 0.24 * fract(sd * 3.71), 0.86 + 0.22 * fract(sd * 5.19)), 0.7); // per-building brick/stone batch
             float col = hsh(vec3(floor(vMapUv.x * 64.0), sd, 1.0)), col2 = hsh(vec3(floor(vMapUv.x * 17.0), sd, 2.0));

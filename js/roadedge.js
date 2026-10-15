@@ -55,6 +55,7 @@ export function buildRoadEdges(W, { slicePath, pointAt }) {
     for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) for (const s of (W.driveGrid?.get((gx + ox) * 100000 + gz + oz) || [])) {
       const dx = s.x2 - s.x1, dz = s.z2 - s.z1, L2 = dx * dx + dz * dz || 1; let t = ((x - s.x1) * dx + (z - s.z1) * dz) / L2; t = Math.max(0, Math.min(1, t));
       if (Math.abs(s.h1 + (s.h2 - s.h1) * t - y) > 1.5) continue; const d = Math.hypot(x - s.x1 - dx * t, z - s.z1 - dz * t); if (d >= s.hw + 0.6) continue;
+      if (s.track === 'pave') continue; // v2: pavement surface is not a connecting road
       if (s.corr || s.track === true) return true; // race track / corridor: never a rail there
       if (own.has(kk(s.x1, s.z1)) && own.has(kk(s.x2, s.z2))) continue;
       const l = Math.sqrt(L2); if (l > 0.3 && Math.abs((dx * fx + dz * fz) / l) > 0.96) { const dl = Math.abs((x - s.x1) * -dz / l + (z - s.z1) * dx / l); if (Math.abs(dl - oA) < 0.35 && Math.abs(s.hw - (oA - RAIL_OFF + W.constructor.PAVEMENT)) < 0.5) continue; } // same street continuing
@@ -79,7 +80,8 @@ export function buildRoadEdges(W, { slicePath, pointAt }) {
     if (hid || r.tun || r.k === 'service' || /footway|path|pedestrian|cycleway/.test(r.k)) continue;
     if (((W.deg.get(e[0]) || 0) === 1 || (W.deg.get(e[1]) || 0) === 1) && P[P.length - 1][3] < 80) continue; // p51: no rails boxing in short dead-end stubs
     if (P.some(p => Math.abs(p[2]) > 0.5)) continue; // street level only (colliders have no height)
-    const kind = MAIN_RE.test(r.k) || RING_RE.test(r.n || '') ? 'armco' : 'rail';
+    if (!/^motorway/.test(r.k)) continue; // p54: barriers only on motorway / flyover edges; every street is open (walk the pavements, mount kerbs)
+    const kind = 'armco';
     const L = P[P.length - 1][3]; if (L < 3) continue; stats.edges++;
     // sharp bends inside one street (OSM corner vertices turning > 28 deg): both rails open up around the corner (kerb only),
     // so a car taking the corner naturally (cutting / running wide) never meets a rail end sticking into its line

@@ -32,6 +32,7 @@ export function defaults() {
     v: 1,
     sound: { master: 0.8, engine: 0.9, exhaust: 0.9, tyres: 0.7, music: 0.5, voice: 1, menu: 0.6, intro: 1, introOn: true, crackle: 1 },
     voice: { enabled: true, mode: 'open', range: 'room', micId: '', micMuted: true, micAsked: false, codec: 'auto', playerVol: {}, muted: {} }, // micMuted: mic OFF by default (and at every launch)
+    world: { weather: 'auto', time: 'auto', hour: 12, rainFx: 'auto' }, // p55 Settings > World
     graphics: { preset: 'auto', ...PRESETS[IS_MOBILE ? 'medium' : 'high'], resAuto: true, motionBlur: false, shake: true, showFps: false, dayCycle: true },
     controls: { steer: HAS_TOUCH ? 'buttons' : 'keyboard', padSens: 0.8, padCurve: 1.7, rumble: 0.8, auto: true, sens: 1, steerAssist: 0.6, abs: true, tc: true, esc: true, smartThrottle: true,
       btnSize: 1, btnHeight: 0, pedalsLeft: false, regen: 1, onePedal: false, evConsumption: false, camera: 'chase', tiltSens: 1 },

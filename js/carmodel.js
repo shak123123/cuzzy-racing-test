@@ -5,6 +5,8 @@
 // sill/shoulder creases, and a greenhouse whose faces are split into roof, pillars, seals and tinted glass.
 // Static parts are merged per material to keep draw calls and triangle counts phone-friendly.
 import * as THREE from 'three';
+import { buildHero, initHero } from './hero.js';
+import { buildPro } from './carpro.js';
 import { fireFX } from './bttf_fx.js';
 import { mergeGeometries } from './lib/addons/utils/BufferGeometryUtils.js';
 import { buildRealCar, carPaint, carGlass, carRubber, contactShadow, attachCarFx, carWeather, wantTransmission } from './realcars.js';
@@ -420,6 +422,7 @@ export function fitInCarCams(root) {
   u.bonnetCam = b; u.bonnetDeg = topDeg(b, 3); void inv; void zb;
 }
 export function buildCar(car, opts = {}) {
+  if (car.pro) { mats(); const root = buildPro(car, opts, { M, wheelGeos, ENV }); PAINT_MATS.add(root.userData.paint); if (car.hero) try { initHero(root, car); } catch (e) { console.warn('hero init', e); } return root; } // p53 pro pipeline (carpro.js)
   if (!opts.procedural) { // first-game 3D models; any failure (e.g. a browser missing a canvas API) falls back to the procedural body
     let real = null; try { real = buildRealCar(car, opts); } catch (e) { console.warn('3D model for', car.id, 'failed, using procedural body:', e); }
     if (real) { if (ENV) real.userData.paint.envMap = ENV; PAINT_MATS.add(real.userData.paint); fitInCarCams(real); rigRealSteer(real); return real; } }

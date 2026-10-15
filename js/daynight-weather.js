@@ -31,11 +31,12 @@ const WEATHER = {
   clear: { cloud: 0.12, fog: 0.0, rain: 0, light: 0 },
   cloudy: { cloud: 0.75, fog: 0.08, rain: 0, light: 0 },
   fog: { cloud: 0.55, fog: 1.0, rain: 0, light: 0 },
+  drizzle: { cloud: 0.8, fog: 0.18, rain: 0.3, light: 0 },
   rain: { cloud: 0.9, fog: 0.25, rain: 0.75, light: 0 },
   storm: { cloud: 1.0, fog: 0.35, rain: 1.0, light: 1 },
 };
 export const WEATHER_NAMES = Object.keys(WEATHER);
-const NEXT = { clear: ['clear', 'cloudy', 'cloudy', 'fog'], cloudy: ['clear', 'rain', 'fog', 'cloudy'], fog: ['clear', 'cloudy'], rain: ['cloudy', 'storm', 'rain', 'clear'], storm: ['rain', 'cloudy'] };
+const NEXT = { clear: ['clear', 'cloudy', 'cloudy', 'fog'], cloudy: ['clear', 'drizzle', 'rain', 'fog', 'cloudy'], drizzle: ['cloudy', 'rain', 'drizzle'], fog: ['clear', 'cloudy', 'drizzle'], rain: ['cloudy', 'storm', 'rain', 'drizzle'], storm: ['rain', 'cloudy'] };
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
 const C = (h) => new THREE.Color(h);
@@ -61,8 +62,8 @@ export class Environment {
   clock() { const m = Math.floor(this.tod * 1440); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
   update(dt) {
     if (!this.frozen) {
-      this.tod = (this.tod + dt / CYCLE) % 1;
-      this.wTimer -= dt;
+      if (!this.timeLock) this.tod = (this.tod + dt / CYCLE) % 1; // p55: Settings > World can pin the time or the weather
+      if (!this.weatherLock) this.wTimer -= dt;
       if (this.wTimer <= 0) { const opts = NEXT[this.target]; this.target = opts[Math.floor(Math.random() * opts.length)]; this.wTimer = 70 + Math.random() * 90; }
     }
     const T = WEATHER[this.target]; const k = 1 - Math.exp(-dt / 9);

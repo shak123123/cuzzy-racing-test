@@ -2,6 +2,7 @@
 // behaviour (solo freezes, online keeps running), remote players and rewards.
 import { padSteer, padPedal } from './rumble.js';
 import * as THREE from 'three';
+import { heroUpdate, heroInput } from './hero.js';
 import { deriveParams, newState, step, mph, velocityWorld } from '../shared/physics.js';
 import { hoverStep } from './hover.js';
 import { buildCar, setLights, poseCar } from './carmodel.js';
@@ -12,6 +13,8 @@ import { KittDash, KittTVs } from './kittdash.js';
 import { Gadgets } from './gadgets.js';
 import { DB5Interior } from './db5int.js';
 import { OnFoot } from './onfoot.js';
+import { StreetLights } from './streetlights.js';
+import { WeatherFX } from './weather.js';
 import { Environment } from './daynight-weather.js';
 import { TIERS, resolvedPreset, applyPreset, IS_MOBILE as _MOB } from './settings.js';
 
@@ -57,6 +60,7 @@ export class Session {
     this.countStart = this.online ? null : performance.now() / 1000 + 0.6;
     if (this.online) { this.bindNet(); }
     this.hud.show(this);
+    try { const W = this.w; if (!W._sl) { W._sl = new StreetLights(W); W._sl.build(W.group); } this.sl = W._sl; } catch (e) { console.warn('street lights', e); } /* p55 UK lamp columns on every street */
     if (!this.isRace) try { this.foot = new OnFoot(this); } catch (e) { console.warn('on foot', e); } /* get out and walk: free roam, open world, meets */
   }
   setCar(car, ups = {}, custom = {}) {
@@ -158,7 +162,7 @@ export class Session {
     this.onWheel = e => { if (this.camMode === 'chase' || this.foot?.active) { const L = this.look; L.zoom = Math.max(0.45, Math.min(2.6, (L.zoom || 1) * (e.deltaY > 0 ? 1.1 : 0.9))); } if (this.camMode === 'orbit') this.orbit.dist = Math.max(3, Math.min(14, this.orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))); };
     cv.addEventListener('pointerdown', this.onPD); addEventListener('pointermove', this.onPM); addEventListener('pointerup', this.onPU); addEventListener('pointercancel', this.onPU); cv.addEventListener('wheel', this.onWheel, { passive: true });
   }
-  unbind() { this.gadgets?.dispose(); this.bint?.dispose(); this.ktv?.dispose();  removeEventListener('blur', this.onWheelBlur); removeEventListener('keydown', this.onKey); removeEventListener('keyup', this.onKey); removeEventListener('deviceorientation', this.onOrient); this.g.canvas.removeEventListener('pointerdown', this.onPD); removeEventListener('pointermove', this.onPM); removeEventListener('pointerup', this.onPU); removeEventListener('pointercancel', this.onPU); this.g.canvas.removeEventListener('wheel', this.onWheel); }
+  unbind() { this.wfx?.dispose(); this.gadgets?.dispose(); this.bint?.dispose(); this.ktv?.dispose();  removeEventListener('blur', this.onWheelBlur); removeEventListener('keydown', this.onKey); removeEventListener('keyup', this.onKey); removeEventListener('deviceorientation', this.onOrient); this.g.canvas.removeEventListener('pointerdown', this.onPD); removeEventListener('pointermove', this.onPM); removeEventListener('pointerup', this.onPU); removeEventListener('pointercancel', this.onPU); this.g.canvas.removeEventListener('wheel', this.onWheel); }
   readInput(dt) {
     const K = this.keys, T = this.touch, c = this.s.controls;
     this.inp.manualClutch = false; this.inp.hPattern = false; this.inp.clutch = 0; this.wheelTransmission = 'inherit';
@@ -232,6 +236,8 @@ export class Session {
     if (this.o.mode === 'test' && this.testLimit && Math.abs(S.vx) > this.testLimit) thr = 0;
     this.inp.throttle = thr; this.inp.brake = brk; this.inp.steer = st; this.inp.handbrake = hb;
     if (this.app.vr?.active) this.app.vr.input(this, dt); // p52 VR wheel + pedals
+    try { heroInput(this, dt); } catch (e) { }
+    if (!this.s.controls.auto && this.s.controls.clutch && !this.inp.manualClutch) { const vc = this.app.vr?.active ? this.app.vr.val?.('left', 3) || 0 : 0; if (this.app.touchUI?.() && !this._tclutch) { const b = this._tclutch = document.createElement('button'); b.id = 'tclutch'; b.textContent = 'CLUTCH'; b.style.cssText = 'position:fixed;left:calc(14px + env(safe-area-inset-left));bottom:150px;z-index:7;padding:16px 14px;border-radius:14px;background:rgba(20,24,30,.7);color:#fff;border:1px solid #445;font:700 13px system-ui'; b.onpointerdown = e => { e.preventDefault(); this.touchClutch = true; }; b.onpointerup = b.onpointercancel = () => { this.touchClutch = false; }; document.body.appendChild(b); } this.inp.manualClutch = true; this.inp.clutch = Math.max(this.keys.has('z') ? 1 : 0, vc, this.touchClutch ? 1 : 0); } // p53 optional clutch: Z / VR left grip / touch CLUTCH
     if (thr || brk || Math.abs(st) > 0.05 || hb) this.lastAct = performance.now();
   }
   canTurbo() { return this.car?.id === 'kitt'; }
@@ -386,11 +392,12 @@ export class Session {
       const L = this.visLiftAt(this.S.x, this.S.z, this.S.y); this.S.visLift = this.S.visLift == null ? L : this.S.visLift + (L - this.S.visLift) * Math.min(1, dt * 12); }
     poseCar(o, this.S, this.P, dt);
     try { this.autoTune(dt); } catch (e) { }
-    if (this.envCycle && !this.paused) { const E = this.envCycle, eo = E.update(dt); this.g.setClock(eo, E.tod * 24); const rn = eo.rain > 0.35; if (rn !== this._envRain) { this._envRain = rn; this.a.setRain(rn); } this.wet = Math.max(eo.wet, rn ? 0.6 : 0); if (eo.target !== this.envW) { this.envW = eo.target; this.hud.flash('Weather: ' + eo.target, 1.4); } }
+    if (this.envCycle && !this.paused) { const E = this.envCycle, eo = E.update(dt); this.g.setClock(eo, E.tod * 24); const rn = eo.rain > 0.35; if (rn !== this._envRain) { this._envRain = rn; this.a.setRain(rn); } this.wet = Math.max(eo.wet, rn ? 0.6 : 0); if (eo.target !== this.envW) { this.envW = eo.target; this.hud.flash('Weather: ' + eo.target, 1.4); } try { (this.wfx ||= new WeatherFX(this)).step(dt, E); } catch (e) { console.warn('weather fx', e); this.envCycle = this.envCycle; this.wfx = { step() { }, dispose() { } }; } }
     const night = this.g.night, tun = this.w.inTunnel(this.S.x, this.S.z, this.S.y);
     const blink = (this.t % 0.8) < 0.4;
     setLights(o, { head: night || tun > 0.5 || this.wet ? 1 : 0, brake: this.inp.brake > 0.1 && !this.S.reverse, rev: this.S.reverse, blink: blink && (this.hazard || (this.paused && this.online)) }, night || tun > 0.5);
     this.g.updateNightLights?.(o, this.w, dt, night || tun > 0.5 || this.wet); // headlight spot + nearest street lamps (medium/high)
+    try { heroUpdate(this, dt); } catch (e) { console.warn('hero', e); } // p53 hero car: lights / indicators / screens / mirrors (after the beam so it can set dipped / full)
     this.updateCam(dt); if (pt) pt = pmk('carVisual+cam', pt);
     // remote cars
     if (this.online) for (const [id, R] of this.remotes) {
@@ -411,7 +418,7 @@ export class Session {
     }
     this.updateFlames(dt); if (pt) pt = pmk('audio+remotes', pt);
     this.g.follow(o.position);
-    this.w.update(this.t, night, this.wet); if (pt) pt = pmk('world.update', pt);
+    this.w.update(this.t, night, this.wet); this.sl?.update(this.envCycle?.out?.lights ?? (night ? 1 : 0), this.g.cam, dt); if (pt) pt = pmk('world.update', pt);
     // net send 15 Hz
     if (this.online && performance.now() - this.lastSent > 66) {
       this.lastSent = performance.now(); const [vwx, vwz] = velocityWorld(this.S);
@@ -580,7 +587,7 @@ export class Session {
       { const w = this.w.wallCross(S.x, S.z, cam.position.x, cam.position.z, S.y); if (w && cam.position.y < 30) { const t = Math.max(0.15, w.t - 0.12); cam.position.x = S.x + (cam.position.x - S.x) * t; cam.position.z = S.z + (cam.position.z - S.z) * t; } this.camGround(cam); } // p51: 360 view never inside a wall / under the road
       cam.lookAt(S.x, S.y + (S.hoverH || 0) + 0.8, S.z); this.camPos = null;
     }
-    this.cockpitInstruments?.update(S, dt, this.camMode === 'cockpit', this.P.redline,
+    this.cockpitInstruments?.update(S, dt, this.camMode === 'cockpit' && !this.obj?.userData?.hero, this.P.redline,
       this.inp.hPattern ? (S.gear < 0 ? 'R' : S.gear === 0 ? 'N' : S.gear) :
         S.reverse ? 'R' : Math.abs(S.vx) < 0.3 && this.inp.throttle < 0.05 && !this.P.ev ? 'N' : this.P.ev ? 'D' : S.gear);
     if (this.camMode === 'chase') { this.shake *= Math.pow(0.02, dt); } // stable chase: no random impact or speed jitter
@@ -591,7 +598,7 @@ export class Session {
     if (this.app.vr?.active) this.app.vr.update(dt, this); // p52 VR seat / hands / wheel / dash
     if (this.shotCam) { const c = this.shotCam; cam.position.set(c[0], c[1], c[2]); cam.lookAt(c[3], c[4], c[5]); cam.clearViewOffset(); } // test screenshots only (tests/x_lm_shots.mjs)
   }
-  dispose() { this.app.rumble?.stop();
+  dispose() { this.app.rumble?.stop(); this._tclutch?.remove();
     this.foot?.dispose(); this.foot = null;
     this.cockpitInstruments?.dispose();
     { const el = document.getElementById('ckov'); if (el) el.style.display = 'none'; }

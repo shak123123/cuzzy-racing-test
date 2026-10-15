@@ -3,6 +3,11 @@ import { standardPad } from './wheel.js';
 // walk or run as Shak, walk into the cinema, club, gun shop, food shops and mosques, buy things with credits, watch
 // YouTube films on the cinema screen, and set waypoints on a full city map that also shows every online player.
 import { Nav } from './nav.js';
+import { Weapons } from './weapons.js';
+import { addPlaces } from './places.js';
+import { Cinema } from './films.js';
+import { Hangout } from './hangout.js';
+import { Ambient } from './ambient.js';
 import * as THREE from 'three';
 import { buildPerson, animPerson } from './person.js';
 import { Venues, BASE_Y, ICON, SHOP, FILMS, ytId } from './venues.js';
@@ -13,7 +18,7 @@ const BTN = 'pointer-events:auto;background:transparent;border:2px solid rgba(25
 export class OnFoot {
   constructor(sess) {
     this.s = sess; this.active = false; this.p = new THREE.Vector3(); this.yaw = 0; this.v = 0; this.cy = 0; this.q = { x: 0, z: 0, yaw: 0 };
-    this.joy = { x: 0, y: 0, id: null }; this.boostT = 0; this.venues = new Venues(sess); this.nav = new Nav(sess); this.wp = null; this.ui();
+    this.joy = { x: 0, y: 0, id: null }; this.boostT = 0; this.venues = new Venues(sess); this.nav = new Nav(sess); this.wp = null; this.ui(); this.wpn = new Weapons(this); try { addPlaces(this); } catch (e) { console.warn('places', e); } this.cine = new Cinema(this); this.zone = new Hangout(this); try { this.amb = new Ambient(this); } catch (e) { console.warn('ambient', e); }
   }
   get inv() { return this.s.app.store?.profile?.inv || {}; }
   ui() {
@@ -22,7 +27,7 @@ export class OnFoot {
     this.jk = el('div', 'position:absolute;left:47px;top:47px;width:56px;height:56px;border-radius:50%;border:2px solid #fff;background:transparent', '', base);
     const right = el('div', 'position:absolute;right:calc(22px + env(safe-area-inset-right));bottom:24px;display:flex;flex-direction:column;gap:10px;align-items:flex-end', '', U);
     this.bAct = el('button', BTN + 'min-width:120px;height:64px', 'GET IN', right); this.bFire = el('button', BTN, 'FIRE', right); this.bRun = el('button', BTN, 'RUN', right);
-    this.bAct.onpointerdown = e => { e.preventDefault(); this.action(); }; this.bFire.onpointerdown = e => { e.preventDefault(); this.fire(); };
+    this.bAct.onpointerdown = e => { e.preventDefault(); this.action(); }; this.bFire.onpointerdown = e => { e.preventDefault(); this.fire(); this.wpn.held = true; }; this.bFire.onpointerup = this.bFire.onpointercancel = () => { this.wpn.held = false; };
     this.bRun.onpointerdown = e => { e.preventDefault(); this.run = !this.run; this.bRun.style.background = this.run ? 'rgba(25,230,193,.35)' : 'transparent'; };
     const jmove = e => { const r = base.getBoundingClientRect(); let x = (e.clientX - r.left - 75) / 60, y = (e.clientY - r.top - 75) / 60; const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } this.joy.x = x; this.joy.y = y; this.jk.style.transform = `translate(${x * 48}px,${y * 48}px)`; };
     base.onpointerdown = e => { e.preventDefault(); this.joy.id = e.pointerId; base.setPointerCapture?.(e.pointerId); jmove(e); };
@@ -46,10 +51,10 @@ export class OnFoot {
     this.p.set(S.x + rx * off * side, S.y, S.z + rz * off * side); this.yaw = S.yaw; this.cy = S.yaw; this.v = 0; this.char.visible = true; this.active = true;
     this.savedCam = s.camMode; if (s.camMode !== 'chase') s.camMode = 'chase'; /* any car view (inside, bonnet, orbit) -> on-foot chase cam, so drag-to-look works */ this.show(); s.a?.sfx?.('door');
   }
-  enterCar() { const s = this.s; this.active = false; this.char.visible = false; if (this.savedCam) s.camMode = this.savedCam; this.show(); }
+  enterCar() { const s = this.s; this.wpn.holster(); this.wpn.aim = false; this.active = false; this.char.visible = false; if (this.savedCam) s.camMode = this.savedCam; this.show(); }
   show() { const on = this.active; this.U.style.display = on ? '' : 'none'; const t = $('#touch'); if (t) t.style.visibility = on ? 'hidden' : ''; const sp = $('.h-speedo'); if (sp) sp.style.visibility = on ? 'hidden' : '';
-    this.bFire.style.display = on && this.weapon() && !this.venues.inside?.info?.noWeapons ? '' : 'none'; if (!on) this.hint.style.display = 'none'; }
-  weapon() { const I = this.inv; return ['smg', 'shotgun', 'pistol'].find(k => I[k]) || null; }
+    this.bFire.style.display = on && this.wpn?.cur && !this.venues.inside ? '' : 'none'; this.wpn?.paint(); if (!on) this.hint.style.display = 'none'; }
+  weapon() { return this.wpn?.cur || null; } // the equipped weapon (null = unarmed); see weapons.js
   // ---------------------------------------------------------------- per frame
   carInput(inp) { if (!this.active) return; inp.throttle = 0; inp.brake = 1; inp.handbrake = 1; inp.steer = 0; }
   step(dt) {
@@ -79,29 +84,33 @@ export class OnFoot {
     let label = '', H = ''; this.ctx = null;
     if (I) { for (const sp of I.spots) if (Math.hypot(this.p.x - sp.x, this.p.z - sp.z) < sp.r) { this.ctx = sp; label = this.sit && sp.act === 'watch' ? 'STAND UP' : sp.label; } if (this.sit) { this.ctx = I.spots.find(x => x.act === 'watch'); label = 'STAND UP'; } }
     else { const v = this.venues.near(this.p); if (v) { this.ctx = { act: 'enter', v }; label = 'ENTER'; H = `${ICON[v.kind]} ${v.name}`; }
+      else if ((this._az = this.amb?.near(this.p))) { const G = this._az; this.ctx = { act: 'talk', fn: () => this.amb.talk(G) }; label = 'TALK'; }
+      else if ((this._hz = this.zone?.near(this.p))) { const G = this._hz; this.ctx = { act: 'talk', fn: () => this.zone.talk(G) }; label = 'TALK'; }
       else if (Math.hypot(this.p.x - s.S.x, this.p.z - s.S.z) < 3.2) { this.ctx = { act: 'car' }; label = 'GET IN'; } }
     this.bAct.textContent = label || '—'; this.bAct.style.opacity = label ? 1 : 0.35; this.hint.style.display = H ? '' : 'none'; if (H) this.hint.textContent = H + (s.app.touchUI() ? '' : '  ·  press F');
-    this.fx?.(dt);
+    this.fx?.(dt); this.wpn.step(dt); this.venues.jobs?.step(); this.cine.step(dt); try { this.amb?.step(dt); } catch (e) { console.warn('ambient', e); this.amb.step = () => { }; } try { this.zone.step(dt); } catch (e) { console.warn('hangout', e); this.zone.step = () => { }; }
   }
   cam(dt) { if (!this.active) return; const cam = this.s.g.cam;
+    if (this.sit && this.cine.camFull(cam)) return; // full-screen in-game film
     if (this.sit) { const p = this.char.position; cam.position.set(p.x, p.y + 1.2, p.z); cam.lookAt(p.x, BASE_Y + 4.6, p.z - 20); cam.fov = 55; cam.updateProjectionMatrix(); return; }
     const L0 = this.s.look; if (L0 && L0.yaw) { this.cy += L0.yaw; L0.yaw = 0; L0.rel = performance.now(); } /* 360 on foot: dragging turns the camera for good, and the stick walks where the camera faces */
     let d = this.yaw - this.cy; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; if (this.v > 0.3 && !(L0 && L0.held) && performance.now() - (L0?.rel || 0) > 1500) this.cy += d * Math.min(1, 0.9 * dt);
     const Lk = this.s.lookStep(dt, this.v > 0.3), Z = Lk.zoom || 1, yv = this.cy + Lk.yaw, inside = !!this.venues.inside, dist = (inside ? 2.6 : 3.4) * Z * (1 - Lk.pitch * 0.2), hgt = 1.45 + ((inside ? 1.75 : 2.0) - 1.45) * Math.min(1.6, Z) + Lk.pitch * 2.2 * Math.min(1.4, Z), p = this.p; /* drag: 360 look; pinch / wheel: zoom */ /* drag to look all round; swings back behind */
     let cx = p.x + Math.sin(yv) * dist, cz = p.z + Math.cos(yv) * dist; if (inside) { const [bx, bz] = this.venues.inside.bounds; cx = Math.max(-bx, Math.min(bx, cx)); cz = Math.max(-bz, Math.min(bz, cz)); } /* camera stays inside the room */
     if (!inside) { const w = this.s.w.wallCross(p.x, p.z, cx, cz, p.y); const want = w ? Math.max(0.2, w.t - 0.1) : 1; this._pull = want < (this._pull ?? 1) ? want : (this._pull ?? 1) + (want - (this._pull ?? 1)) * Math.min(1, 3 * dt); cx = p.x + (cx - p.x) * this._pull; cz = p.z + (cz - p.z) * this._pull; } /* p51: on-foot camera never inside a wall */
-    cam.position.set(cx, p.y + hgt, cz); cam.lookAt(p.x, p.y + 1.45, p.z); if (Math.abs(cam.fov - 60) > 0.1) { cam.fov = 60; cam.updateProjectionMatrix(); } }
+    cam.position.set(cx, p.y + hgt, cz); cam.lookAt(p.x, p.y + 1.45, p.z); if (!inside && this.wpn.cam(dt, cam, Lk)) return; if (Math.abs(cam.fov - 60) > 0.1) { cam.fov = 60; cam.updateProjectionMatrix(); } }
   // ---------------------------------------------------------------- actions
   action() { const c = this.ctx; if (!c) return; const s = this.s;
     if (c.act === 'car') this.enterCar();
     else if (c.act === 'enter') this.goIn(c.v);
     else if (c.act === 'leave') this.goOut();
     else if (c.act === 'shop') this.shop(c.shop);
-    else if (c.act === 'watch') { if (this.sit) { this.sit = null; this.venues.inside.play?.(null); } else this.films(c); } }
+    else if (c.fn) c.fn(this); // p55 places.js spots (talk, job board, snooker table, ...)
+    else if (c.act === 'watch') { if (this.sit) { this.sit = null; this.cine.stop(); this.venues.inside.play?.(null); } else this.films(c); } }
   async blink(fn) { this.fade.style.opacity = 1; await new Promise(r => setTimeout(r, 360)); fn(); this.fade.style.opacity = 0; }
   goIn(v) { this.blink(() => { const I = this.venues.enter(v); this.p.set(I.entry.x, BASE_Y, I.entry.z - 2.2); /* a couple of steps in, so the camera has room behind */ this.yaw = this.cy = 0; this.v = 0;
       this.s.hud.flash(I.info?.msg || v.name, 2.2); this.show(); }); }
-  goOut() { this.blink(() => { const v = this.venues.inside?.v; this.sit = null; this.venues.leave();
+  goOut() { this.cine.stop(); this.blink(() => { const v = this.venues.inside?.v; this.sit = null; this.venues.leave();
       if (v) { this.p.set(v.x + Math.sin(v.yaw) * 1.6, v.y, v.z + Math.cos(v.yaw) * 1.6); this.yaw = this.cy = v.yaw + Math.PI; } this.show(); }); }
   menu(title, rows) { this.closeMenu(); const m = this.M = el('div', 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,92vw);max-height:80vh;overflow:auto;background:rgba(10,12,16,.94);border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:16px;color:#fff;font:15px system-ui;z-index:9', `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:18px">${title}</b><button data-x style="${BTN}height:36px;min-width:44px">✕</button></div>`);
     m.querySelector('[data-x]').onclick = () => this.closeMenu(); for (const r of rows) m.appendChild(r); return m; }
@@ -111,21 +120,21 @@ export class OnFoot {
   shop(kind) { const st = this.s.app.store, cr = () => (st?.profile?.credits ?? 0).toLocaleString();
     const head = document.createElement('div'); head.style.cssText = 'opacity:.8;margin-bottom:4px'; head.textContent = `You have ${cr()} credits`;
     const rows = SHOP[kind].map(([id, n, price]) => this.row(`${n}${this.inv[id] && kind === 'guns' ? ' <small style="color:#19e6c1">owned</small>' : ''}`, `${price} cr`, async b => {
-      b.disabled = true; try { const j = await st.act('shop', { item: id }); head.textContent = `Bought ${n}. You have ${cr()} credits`; this.s.a?.sfx?.('buy');
-        if (kind === 'food' || kind === 'club' || kind === 'cinema') { this.boostT = 120; this.s.hud.flash(kind === 'food' ? 'Fed — you run faster for 2 minutes' : 'Enjoy', 1.6); } this.show(); }
+      b.disabled = true; try { const j = await st.act('shop', { item: id }); head.textContent = `Bought ${n}. You have ${cr()} credits`; this.s.a?.sfx?.('buy'); if (kind === 'guns') this.wpn.restock(id);
+        if (kind === 'food' || kind === 'club' || kind === 'cinema' || kind === 'store' || kind === 'snooker') { this.boostT = 120; this.s.hud.flash(kind === 'food' ? 'Fed — you run faster for 2 minutes' : 'Enjoy', 1.6); } this.show(); }
       catch (e) { head.textContent = e.message || 'Could not buy that'; } b.disabled = false; }));
-    if (kind === 'guns') rows.push(Object.assign(document.createElement('small'), { textContent: 'Weapons fire in open world streets (not inside venues or mosques). Other players are not harmed yet.', style: 'opacity:.6' }));
-    this.menu({ guns: 'AMMU-BRUM', food: 'Order food', club: 'Bar', cinema: 'Snacks' }[kind], [head, ...rows]); }
+    if (kind === 'guns') rows.push(Object.assign(document.createElement('small'), { textContent: 'Select with 1-4, Tab or the weapon button outside. Weapons stay holstered inside venues and mosques. Buying a gun again refills its ammo. Other players are not harmed yet.', style: 'opacity:.6' }));
+    this.menu({ guns: 'AMMU-BRUM', food: 'Order food', club: 'Bar', cinema: 'Snacks', store: 'Shop counter', snooker: 'Bar' }[kind] || 'Shop', [head, ...rows]); }
   films(spot) { const I = this.venues.inside, go = id => { this.closeMenu(); this.sit = spot.sit; I.play(id); this.s.hud.flash('Enjoy the film — tap STAND UP to leave your seat', 2); };
-    const rows = FILMS.map(([n, id]) => this.row(n, 'WATCH', () => go(id)));
+    const goC = (k, full) => { this.closeMenu(); I.play(null); this.sit = spot.sit; this.cine.start(I, k, full); this.s.hud.flash('Now showing: ' + this.cine.title(k) + ' — tap STAND UP to leave', 2); };
+    const cap = document.createElement('div'); cap.innerHTML = '<b style="color:#ffcc33">CUZZY PICTURES</b> <small style="opacity:.7">· short films made in the game</small>';
+    const own = this.cine.list().map(([k, n, sub]) => { const r = this.row(`${n}<br><small style="opacity:.65">${sub}</small>`, 'WATCH', () => goC(k, false)); const fb = document.createElement('button'); fb.style.cssText = BTN + 'height:38px;margin-left:6px'; fb.textContent = 'FULL'; fb.onclick = () => goC(k, true); r.appendChild(fb); return r; });
+    const cap2 = document.createElement('div'); cap2.style.cssText = 'margin-top:10px'; cap2.innerHTML = '<b>YouTube</b>';
+    const rows = [cap, ...own, cap2, ...FILMS.map(([n, id]) => this.row(n, 'WATCH', () => go(id)))];
     const f = document.createElement('div'); f.style.cssText = 'display:flex;gap:8px;margin-top:10px'; f.innerHTML = `<input placeholder="Paste a YouTube link" style="flex:1;min-width:0;background:#111;border:1px solid #444;color:#fff;border-radius:10px;padding:10px">`;
     const b = document.createElement('button'); b.style.cssText = BTN + 'height:40px'; b.textContent = 'PLAY'; b.onclick = () => { const id = ytId(f.firstChild.value); if (id) go(id); else f.firstChild.style.borderColor = '#ff5a4a'; }; f.appendChild(b);
     this.menu('Now showing', [...rows, f]); }
-  fire() { const s = this.s, w = this.weapon(); if (!w || this.venues.inside?.info?.noWeapons || this.venues.inside) return; const now = performance.now(); if (now - (this.lastShot || 0) < (w === 'smg' ? 90 : w === 'shotgun' ? 700 : 260)) return; this.lastShot = now;
-    const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw), o = new THREE.Vector3(this.p.x + fx * 0.6, this.p.y + 1.35, this.p.z + fz * 0.6), e = o.clone().add(new THREE.Vector3(fx * 60, 0, fz * 60));
-    const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints([o, e]), new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 1, toneMapped: false })), fl = new THREE.PointLight(0xffc060, 8, 6); fl.position.copy(o);
-    s.scene.add(ln, fl); let t = 0; const prev = this.fx; this.fx = dt => { prev?.(dt); t += dt; ln.material.opacity = Math.max(0, 1 - t * 10); fl.intensity = Math.max(0, 8 - t * 120); if (t > 0.12 && ln.parent) { s.scene.remove(ln, fl); ln.geometry.dispose(); ln.material.dispose(); } };
-    setTimeout(() => { this.fx = null; }, 400); this.bang(w); }
+  fire() { this.wpn.trigger(true); }
   bang(w) { try { const A = this.ac || (this.ac = new (window.AudioContext || window.webkitAudioContext)()), n = A.sampleRate * 0.25, b = A.createBuffer(1, n, A.sampleRate), d = b.getChannelData(0);
       for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (A.sampleRate * (w === 'shotgun' ? 0.07 : 0.03))); const src = A.createBufferSource(), f = A.createBiquadFilter(), g = A.createGain(); f.type = 'lowpass'; f.frequency.value = 2500; g.gain.value = 0.5; src.buffer = b; src.connect(f).connect(g).connect(A.destination); src.start(); } catch (e) { } }
   // ---------------------------------------------------------------- waypoint + maps
@@ -166,7 +175,7 @@ export class OnFoot {
   remote(R, ft, dt) { if (!ft) { if (R.foot) R.foot.visible = false; return; } if (!R.foot) { R.foot = buildPerson(Math.abs([...(R.name || 'x')].reduce((a, c) => a * 31 + c.charCodeAt(0), 7)) % 6); this.s.scene.add(R.foot); }
     const f = R.foot; f.visible = true; const k = Math.min(1, 10 * dt); f.position.x += (ft[0] - f.position.x) * k; f.position.y += (ft[1] - f.position.y) * k; f.position.z += (ft[2] - f.position.z) * k;
     let d = ft[3] - f.rotation.y; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; f.rotation.y += d * k; animPerson(f, dt, ft[4] || 0); if (Math.hypot(ft[0] - f.position.x, ft[2] - f.position.z) > 8) f.position.set(ft[0], ft[1], ft[2]); }
-  dispose() { this.nav?.dispose(); removeEventListener('keydown', this.onKey); removeEventListener('keyup', this.onKey); this.closeMap(); this.closeMenu(); this.venues.dispose(); this.setWp(null);
+  dispose() { this.cine?.stop(); this.zone?.dispose(); this.amb?.dispose(); this.wpn?.dispose(); this.nav?.dispose(); removeEventListener('keydown', this.onKey); removeEventListener('keyup', this.onKey); this.closeMap(); this.closeMenu(); this.venues.dispose(); this.setWp(null);
     if (this.char) this.s.scene.remove(this.char); for (const R of this.s.remotes.values()) if (R.foot) this.s.scene.remove(R.foot);
     for (const e of [this.U, this.bMap, this.hint, this.fade]) e.remove(); this.bOut.hidden = true; const t = $('#touch'); if (t) t.style.visibility = ''; const sp = $('.h-speedo'); if (sp) sp.style.visibility = ''; }
 }

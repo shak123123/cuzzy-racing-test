@@ -13,6 +13,7 @@ import { Session, fmt } from './game.js';
 import { aiWanted, pickField } from './ai.js';
 import { OpenWorld } from './openworld.js';
 import { StreetLife } from './streetlife.js';
+import { buildMapfill } from './mapfill.js';
 import { Hud } from './hud.js';
 import { Showroom, CATS } from './showroom.js';
 import { SettingsUI, howtoHTML } from './ui_settings.js';
@@ -131,8 +132,9 @@ class App {
     if (this.world) { this.gfx.scene.remove(this.world.group); this.world.group.traverse(o => { o.geometry?.dispose(); }); }
     const g = this.settings.graphics; this.worldEnv = g.envDetail;
     this.world = new World(this.data, this.routes, { env: g.envDetail, shadows: g.shadows, aniso: IS_MOBILE ? 8 : 12 }, onProg);
-    const grp = await this.world.build(); grp.traverse(o => { if (o.isMesh) o.receiveShadow = g.shadows > 0; }); this.gfx.scene.add(grp);
+    const grp = await this.world.build(); try { const _q = this.world.q || { env: this.settings.graphics.envDetail }; this.lookN = (await import('./look.js')).applyLook(this.world, _q); } catch (e) { console.warn('look', e); } grp.traverse(o => { if (o.isMesh) o.receiveShadow = g.shadows > 0; }); this.gfx.scene.add(grp);
     { const sl = new StreetLife(this.world, this.settings, this.cars); grp.add(sl.build()); this.streetlife = sl; this.gfx.probeHide = sl.group; this.gfx.updaters = [(dt, c) => sl.update(dt, c)]; } // parked cars + pedestrians
+    try { const mf = await buildMapfill(this.world, this); if (mf) { grp.add(mf.group); this.mapfill = mf; this.gfx.updaters.push((dt, c) => mf.update(dt, c)); } } catch (e) { console.warn('mapfill', e); } // blank-area fill, parody hotspots, Shak ads (mapfill.js)
   }
   // ================================================================ intro
   setupIntroScene() {

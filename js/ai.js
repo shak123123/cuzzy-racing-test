@@ -7,7 +7,7 @@
 import { deriveParams, newState, step } from '../shared/physics.js';
 import { buildCar, setLights, poseCar } from './carmodel.js';
 
-export const AI_CARS = ['db9v', 'box986', 'gti8', 'rrs23', 'r8', 'hurac', 'avent', 'f458'];
+export const AI_CARS = ['r6a', 'db9v', 'box986', 'gti8', 'rrs23', 'r8', 'hurac', 'avent', 'f458'];
 const NAMES = ['Kez "Digbeth" Malik', 'Jaz Okafor', 'Ricky Balti', 'Priya Sandhu', 'Danny Two-Tone', 'Leanne Brindley', 'Mo Hussain', 'Tasha Cole', 'Big Dev', 'Sian Moseley', 'Aaron Kaur', 'Callum Reece'];
 const PAINTS = [0xd0121b, 0x1f5fd6, 0xf2f2f2, 0x111214, 0xffc21a, 0x19a35b, 0xff6a00, 0x7a2bd1, 0x8f9aa6, 0x0bb6c9, 0xe8457a, 0x2b3a55];
 // grip used in corners (fraction of the tyre limit), braking decel (g), throttle cap, line spread
